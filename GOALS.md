@@ -14,7 +14,7 @@ An iOS app that lets users connect multiple iPhones to capture video from severa
 ## Roles
 
 - **Director:** The device that discovers and connects to cameras, displays all feeds, and controls recording.
-- **Camera:** A device that captures video and streams it to the director.
+- **Camera:** A device that captures video and streams it to the director. Shows a live preview so the user can frame their shot.
 
 ## UX Principles
 
@@ -23,16 +23,19 @@ An iOS app that lets users connect multiple iPhones to capture video from severa
 - **Automatic connection:** Camera devices should appear on the director automatically. One tap to connect, no manual IP entry or pairing codes.
 - **Always-visible grid:** The director displays all connected camera feeds in a live grid at all times. No switching between views or navigating tabs.
 
-## Capture
+## Capture & Export
 
 - All recording is initiated and stored on the director device.
 - The director can start/stop recording for all connected cameras simultaneously with a single action.
-- Each camera stream is saved as a separate file with synchronized timestamps, ready for multi-angle editing.
-- Camera devices stream only — they don't need to manage recordings or storage.
+- Audio is captured from the director device's microphone only.
+- On export, the user chooses between:
+  - **Grid composite:** A single video with all angles arranged in a split-screen layout.
+  - **Separate files:** Individual video files per angle with synchronized timestamps, ready for multi-angle editing.
+- Recordings are saved to the camera roll.
 
 ## Constraints
 
-- iOS only (leveraging Apple frameworks: Multipeer Connectivity, AVFoundation, VideoToolbox)
+- iOS only, built with SwiftUI (leveraging Apple frameworks: Multipeer Connectivity, AVFoundation, VideoToolbox)
 - Practical limit of ~3–4 simultaneous camera streams due to bandwidth
 - Hardware H.264/HEVC encoding to keep streams manageable
 - No internet connection required — fully local/peer-to-peer
