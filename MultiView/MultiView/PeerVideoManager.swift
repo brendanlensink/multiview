@@ -1,5 +1,4 @@
 import MultipeerConnectivity
-import VideoToolbox
 import os
 import SwiftUI
 
@@ -8,18 +7,17 @@ final class PeerVideoManager {
     private let logger = Logger(subsystem: "com.multiview", category: "PeerVideo")
 
     private var decoders: [MCPeerID: VideoDecoder] = [:]
-    private(set) var latestFrames: [MCPeerID: CGImage] = [:]
+    private(set) var displayLayers: [MCPeerID: SampleBufferDisplayLayer] = [:]
 
     func handleFrame(from peer: MCPeerID, packet: FramePacket) {
-        let decoder = decoders[peer] ?? createDecoder(for: peer)
-
+        let (decoder, layer) = decoderAndLayer(for: peer)
         decoder.decode(packet: packet)
     }
 
     func removePeer(_ peer: MCPeerID) {
         decoders[peer]?.invalidate()
         decoders.removeValue(forKey: peer)
-        latestFrames.removeValue(forKey: peer)
+        displayLayers.removeValue(forKey: peer)
     }
 
     func removeAllPeers() {
@@ -27,27 +25,27 @@ final class PeerVideoManager {
             decoder.invalidate()
         }
         decoders.removeAll()
-        latestFrames.removeAll()
+        displayLayers.removeAll()
     }
 
     // MARK: - Private
 
-    private func createDecoder(for peer: MCPeerID) -> VideoDecoder {
+    private func decoderAndLayer(for peer: MCPeerID) -> (VideoDecoder, SampleBufferDisplayLayer) {
+        if let decoder = decoders[peer], let layer = displayLayers[peer] {
+            return (decoder, layer)
+        }
+
+        let layer = SampleBufferDisplayLayer()
         let decoder = VideoDecoder()
-        decoder.onDecodedFrame = { [weak self] pixelBuffer in
-            guard let cgImage = Self.createCGImage(from: pixelBuffer) else { return }
-            Task { @MainActor [weak self] in
-                self?.latestFrames[peer] = cgImage
+        decoder.onSampleBuffer = { [weak layer] sampleBuffer in
+            DispatchQueue.main.async {
+                layer?.enqueue(sampleBuffer)
             }
         }
-        decoders[peer] = decoder
-        logger.info("Created decoder for \(peer.displayName)")
-        return decoder
-    }
 
-    private static func createCGImage(from pixelBuffer: CVPixelBuffer) -> CGImage? {
-        var cgImage: CGImage?
-        VTCreateCGImageFromCVPixelBuffer(pixelBuffer, options: nil, imageOut: &cgImage)
-        return cgImage
+        decoders[peer] = decoder
+        displayLayers[peer] = layer
+        logger.info("Created decoder and display layer for \(peer.displayName)")
+        return (decoder, layer)
     }
 }

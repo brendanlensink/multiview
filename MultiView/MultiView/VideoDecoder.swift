@@ -4,9 +4,8 @@ import os
 final class VideoDecoder: @unchecked Sendable {
     private let logger = Logger(subsystem: "com.multiview", category: "VideoDecoder")
 
-    private var decompressionSession: VTDecompressionSession?
     private var formatDescription: CMFormatDescription?
-    var onDecodedFrame: (@Sendable (CVPixelBuffer) -> Void)?
+    var onSampleBuffer: (@Sendable (CMSampleBuffer) -> Void)?
 
     func decode(packet: FramePacket) {
         if packet.isKeyFrame, let paramData = packet.parameterSets {
@@ -44,15 +43,10 @@ final class VideoDecoder: @unchecked Sendable {
             return
         }
 
-        decodeFrame(sampleBuffer)
+        onSampleBuffer?(sampleBuffer)
     }
 
     func invalidate() {
-        if let session = decompressionSession {
-            VTDecompressionSessionWaitForAsynchronousFrames(session)
-            VTDecompressionSessionInvalidate(session)
-        }
-        decompressionSession = nil
         formatDescription = nil
     }
 
@@ -86,54 +80,6 @@ final class VideoDecoder: @unchecked Sendable {
 
         if formatDescription == nil || !CMFormatDescriptionEqual(formatDescription!, otherFormatDescription: newFormatDesc) {
             formatDescription = newFormatDesc
-            recreateDecompressionSession()
-        }
-    }
-
-    private func recreateDecompressionSession() {
-        if let session = decompressionSession {
-            VTDecompressionSessionInvalidate(session)
-        }
-
-        guard let formatDesc = formatDescription else { return }
-
-        let attrs: [NSString: Any] = [
-            kCVPixelBufferPixelFormatTypeKey: kCVPixelFormatType_32BGRA
-        ]
-
-        var session: VTDecompressionSession?
-        let status = VTDecompressionSessionCreate(
-            allocator: nil,
-            formatDescription: formatDesc,
-            decoderSpecification: nil,
-            imageBufferAttributes: attrs as CFDictionary,
-            outputCallback: nil,
-            decompressionSessionOut: &session
-        )
-
-        guard status == noErr else {
-            logger.error("Failed to create decompression session: \(status)")
-            return
-        }
-
-        decompressionSession = session
-        logger.info("Decompression session created")
-    }
-
-    private func decodeFrame(_ sampleBuffer: CMSampleBuffer) {
-        guard let session = decompressionSession else { return }
-
-        VTDecompressionSessionDecodeFrame(
-            session,
-            sampleBuffer: sampleBuffer,
-            flags: [._EnableAsynchronousDecompression],
-            infoFlagsOut: nil
-        ) { [weak self] status, _, imageBuffer, _, _ in
-            guard status == noErr, let pixelBuffer = imageBuffer else {
-                self?.logger.error("Decode frame failed: \(status)")
-                return
-            }
-            self?.onDecodedFrame?(pixelBuffer)
         }
     }
 

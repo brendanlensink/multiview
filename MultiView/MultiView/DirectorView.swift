@@ -94,7 +94,7 @@ struct DirectorView: View {
                 ForEach(peers, id: \.self) { peer in
                     PeerVideoCell(
                         peerName: peer.displayName,
-                        frame: videoManager.latestFrames[peer]
+                        displayLayer: videoManager.displayLayers[peer]
                     )
                     .frame(width: cellWidth, height: cellHeight)
                 }
@@ -107,14 +107,12 @@ struct DirectorView: View {
 
 private struct PeerVideoCell: View {
     let peerName: String
-    let frame: CGImage?
+    let displayLayer: SampleBufferDisplayLayer?
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
-            if let frame {
-                Image(decorative: frame, scale: 1.0)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
+            if let displayLayer {
+                SampleBufferVideoView(layer: displayLayer)
             } else {
                 Color.black
                 ProgressView()
