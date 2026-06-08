@@ -41,6 +41,7 @@ struct DirectorView: View {
     @State private var permissionManager = PermissionManager()
     @State private var videoManager = PeerVideoManager()
     @State private var captureManager = CaptureManager()
+    @State private var recordingManager = RecordingManager()
     @State private var localDisplayLayer = SampleBufferDisplayLayer()
 
     var body: some View {
@@ -74,10 +75,15 @@ struct DirectorView: View {
         ZStack {
             Color.black.ignoresSafeArea()
             videoGrid
+            recordButton
         }
         .onAppear {
-            captureManager.onRawSampleBuffer = { [localDisplayLayer] sampleBuffer in
+            captureManager.onRawSampleBuffer = { [localDisplayLayer, recordingManager] sampleBuffer in
                 localDisplayLayer.enqueue(sampleBuffer)
+                recordingManager.appendVideoSampleBuffer(sampleBuffer)
+            }
+            captureManager.onAudioSampleBuffer = { [recordingManager] sampleBuffer in
+                recordingManager.appendAudioSampleBuffer(sampleBuffer)
             }
             captureManager.start()
 
@@ -91,6 +97,7 @@ struct DirectorView: View {
         }
         .onDisappear {
             captureManager.onRawSampleBuffer = nil
+            captureManager.onAudioSampleBuffer = nil
             captureManager.stop()
 
             connectivity.onFrameReceived = nil
@@ -101,6 +108,41 @@ struct DirectorView: View {
             let disconnected = oldPeers.filter { !newPeers.contains($0) }
             for peer in disconnected {
                 videoManager.removePeer(peer)
+            }
+        }
+    }
+
+    private var recordButton: some View {
+        VStack {
+            Spacer()
+            HStack {
+                Spacer()
+                Button {
+                    if recordingManager.isRecording {
+                        Task {
+                            let _ = await recordingManager.stopRecording()
+                        }
+                    } else {
+                        recordingManager.startRecording()
+                    }
+                } label: {
+                    Circle()
+                        .fill(recordingManager.isRecording ? .red : .white)
+                        .frame(width: 64, height: 64)
+                        .overlay {
+                            if recordingManager.isRecording {
+                                RoundedRectangle(cornerRadius: 4)
+                                    .fill(.white)
+                                    .frame(width: 24, height: 24)
+                            }
+                        }
+                        .overlay {
+                            Circle()
+                                .strokeBorder(.white, lineWidth: 3)
+                        }
+                }
+                .padding(.bottom, 24)
+                Spacer()
             }
         }
     }
