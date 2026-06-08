@@ -33,6 +33,10 @@ final class PeerVideoManager {
         decoders[peer]?.onRecordSampleBuffer = callback
     }
 
+    func clearRecordingCallback(for peer: MCPeerID) {
+        decoders[peer]?.onRecordSampleBuffer = nil
+    }
+
     func clearRecordingCallbacks() {
         for decoder in decoders.values {
             decoder.onRecordSampleBuffer = nil

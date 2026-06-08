@@ -1,3 +1,4 @@
+import AVFoundation
 import SwiftUI
 
 // MARK: - Grid Layout
@@ -68,6 +69,11 @@ struct DirectorView: View {
                 permissionManager.refreshStatuses()
                 connectivity.handleAppForegrounded()
             } else if scenePhase == .background {
+                if recordingManager.isRecording {
+                    videoManager.clearRecordingCallbacks()
+                    recordingManager.finalizeAllForBackground()
+                    recordingStartDate = nil
+                }
                 connectivity.handleAppBackgrounded()
             }
         }
@@ -114,7 +120,19 @@ struct DirectorView: View {
         .onChange(of: connectivity.connectedPeers) { oldPeers, newPeers in
             let disconnected = oldPeers.filter { !newPeers.contains($0) }
             for peer in disconnected {
+                if recordingManager.isRecording {
+                    videoManager.clearRecordingCallback(for: peer)
+                    recordingManager.finalizePeerStream(peer)
+                }
                 videoManager.removePeer(peer)
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: AVCaptureSession.wasInterruptedNotification, object: captureManager.previewSource)) { notification in
+            guard recordingManager.isRecording else { return }
+            let reason = (notification.userInfo?[AVCaptureSessionInterruptionReasonKey] as? NSNumber)
+                .flatMap { AVCaptureSession.InterruptionReason(rawValue: $0.intValue) }
+            if reason == .audioDeviceInUseByAnotherClient || reason == .videoDeviceInUseByAnotherClient {
+                recordingManager.finalizeLocalStream()
             }
         }
     }
@@ -122,7 +140,7 @@ struct DirectorView: View {
     private var recordingOverlay: some View {
         VStack {
             if recordingManager.isRecording, let startDate = recordingStartDate {
-                RecordingIndicator(startDate: startDate)
+                RecordingIndicator(startDate: startDate, lostStreamCount: recordingManager.lostStreamCount)
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
             Spacer()
@@ -228,6 +246,7 @@ struct DirectorView: View {
 
 private struct RecordingIndicator: View {
     let startDate: Date
+    var lostStreamCount = 0
     @State private var dotVisible = true
 
     var body: some View {
@@ -240,6 +259,12 @@ private struct RecordingIndicator: View {
             Text(startDate, style: .timer)
                 .font(.caption.monospacedDigit())
                 .fontWeight(.medium)
+
+            if lostStreamCount > 0 {
+                Text("\(lostStreamCount) lost")
+                    .font(.caption2)
+                    .foregroundStyle(.yellow)
+            }
         }
         .foregroundStyle(.white)
         .padding(.horizontal, 10)
