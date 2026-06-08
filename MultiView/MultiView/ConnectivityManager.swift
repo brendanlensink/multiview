@@ -7,7 +7,9 @@ enum ConnectionState: Equatable, Sendable {
     case idle
     case advertising
     case browsing
+    case connecting
     case connected
+    case disconnected
 }
 
 private struct SendablePeer: @unchecked Sendable {
@@ -74,7 +76,7 @@ final class ConnectivityManager: NSObject {
         browser?.stopBrowsingForPeers()
         browser = nil
         discoveredPeers.removeAll()
-        if connectionState == .browsing {
+        if connectionState == .browsing || connectionState == .connecting {
             connectionState = connectedPeers.isEmpty ? .idle : .connected
         }
     }
@@ -83,6 +85,7 @@ final class ConnectivityManager: NSObject {
 
     func invitePeer(_ peer: MCPeerID) {
         browser?.invitePeer(peer, to: session, withContext: nil, timeout: 30)
+        connectionState = .connecting
         logger.info("Sent invitation to \(peer.displayName)")
     }
 
@@ -132,10 +135,16 @@ extension ConnectivityManager: @preconcurrency MCSessionDelegate {
             switch state {
             case .notConnected:
                 self.logger.info("\(peer.displayName) disconnected")
+                let wasConnected = self.connectedPeers.contains(peer)
                 self.connectedPeers.removeAll { $0 == peer }
-                self.connectionState = self.connectedPeers.isEmpty ? .idle : .connected
+                if self.connectedPeers.isEmpty {
+                    self.connectionState = wasConnected ? .disconnected : .idle
+                }
             case .connecting:
                 self.logger.info("\(peer.displayName) connecting...")
+                if self.connectionState == .browsing || self.connectionState == .idle {
+                    self.connectionState = .connecting
+                }
             case .connected:
                 self.logger.info("\(peer.displayName) connected")
                 if !self.connectedPeers.contains(peer) {
