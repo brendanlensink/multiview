@@ -14,6 +14,8 @@ final class CaptureManager: NSObject {
     private(set) var isRunning = false
     private(set) var error: String?
 
+    nonisolated var onRawSampleBuffer: (@Sendable (CMSampleBuffer) -> Void)?
+
     var onEncodedFrame: (@Sendable (FramePacket) -> Void)? {
         didSet { encoderBridge.onEncodedFrame = onEncodedFrame }
     }
@@ -79,6 +81,7 @@ final class CaptureManager: NSObject {
 
 extension CaptureManager: AVCaptureVideoDataOutputSampleBufferDelegate {
     nonisolated func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
+        onRawSampleBuffer?(sampleBuffer)
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
         let presentationTime = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
         encoderBridge.encode(pixelBuffer: pixelBuffer, presentationTime: presentationTime)

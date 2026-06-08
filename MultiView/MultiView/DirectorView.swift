@@ -5,6 +5,8 @@ struct DirectorView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var permissionManager = PermissionManager()
     @State private var videoManager = PeerVideoManager()
+    @State private var captureManager = CaptureManager()
+    @State private var localDisplayLayer = SampleBufferDisplayLayer()
 
     var body: some View {
         Group {
@@ -36,14 +38,16 @@ struct DirectorView: View {
     private var directorContent: some View {
         ZStack {
             Color.black.ignoresSafeArea()
-
-            if connectivity.connectedPeers.isEmpty {
-                waitingView
-            } else {
-                videoGrid
-            }
+            videoGrid
         }
         .onAppear {
+            captureManager.onRawSampleBuffer = { [localDisplayLayer] sampleBuffer in
+                DispatchQueue.main.async {
+                    localDisplayLayer.enqueue(sampleBuffer)
+                }
+            }
+            captureManager.start()
+
             connectivity.onFrameReceived = { [videoManager] peer, packet in
                 Task { @MainActor in
                     videoManager.handleFrame(from: peer, packet: packet)
@@ -52,6 +56,9 @@ struct DirectorView: View {
             connectivity.startAdvertising()
         }
         .onDisappear {
+            captureManager.onRawSampleBuffer = nil
+            captureManager.stop()
+
             connectivity.onFrameReceived = nil
             connectivity.stopAdvertising()
             videoManager.removeAllPeers()
@@ -64,26 +71,13 @@ struct DirectorView: View {
         }
     }
 
-    private var waitingView: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "antenna.radiowaves.left.and.right")
-                .font(.system(size: 48))
-                .foregroundStyle(.blue)
-                .symbolEffect(.pulse, options: .repeating)
-
-            Text("Waiting for cameras…")
-                .font(.title2)
-                .fontWeight(.medium)
-                .foregroundStyle(.white)
-        }
-    }
-
     private var videoGrid: some View {
         let peers = connectivity.connectedPeers
-        let columns = peers.count <= 1 ? 1 : 2
+        let totalCells = peers.count + 1
+        let columns = totalCells <= 1 ? 1 : 2
 
         return GeometryReader { geometry in
-            let rows = (peers.count + columns - 1) / columns
+            let rows = (totalCells + columns - 1) / columns
             let cellWidth = geometry.size.width / CGFloat(columns)
             let cellHeight = geometry.size.height / CGFloat(rows)
 
@@ -91,6 +85,13 @@ struct DirectorView: View {
                 columns: Array(repeating: GridItem(.fixed(cellWidth), spacing: 0), count: columns),
                 spacing: 0
             ) {
+                PeerVideoCell(
+                    peerName: "Director",
+                    displayLayer: localDisplayLayer,
+                    isLocal: true
+                )
+                .frame(width: cellWidth, height: cellHeight)
+
                 ForEach(peers, id: \.self) { peer in
                     PeerVideoCell(
                         peerName: peer.displayName,
@@ -108,6 +109,7 @@ struct DirectorView: View {
 private struct PeerVideoCell: View {
     let peerName: String
     let displayLayer: SampleBufferDisplayLayer?
+    var isLocal = false
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
@@ -129,6 +131,12 @@ private struct PeerVideoCell: View {
                 .padding(8)
         }
         .clipped()
+        .overlay {
+            if isLocal {
+                RoundedRectangle(cornerRadius: 4)
+                    .strokeBorder(.blue, lineWidth: 2)
+            }
+        }
     }
 }
 
