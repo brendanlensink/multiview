@@ -43,6 +43,8 @@ struct DirectorView: View {
     @State private var captureManager = CaptureManager()
     @State private var recordingManager = RecordingManager()
     @State private var localDisplayLayer = SampleBufferDisplayLayer()
+    @State private var isTransitioning = false
+    @State private var recordingStartDate: Date?
 
     var body: some View {
         Group {
@@ -75,7 +77,7 @@ struct DirectorView: View {
         ZStack {
             Color.black.ignoresSafeArea()
             videoGrid
-            recordButton
+            recordingOverlay
         }
         .onAppear {
             captureManager.onRawSampleBuffer = { [localDisplayLayer, recordingManager] sampleBuffer in
@@ -117,37 +119,51 @@ struct DirectorView: View {
         }
     }
 
-    private var recordButton: some View {
+    private var recordingOverlay: some View {
         VStack {
+            if recordingManager.isRecording, let startDate = recordingStartDate {
+                RecordingIndicator(startDate: startDate)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
             Spacer()
             HStack {
                 Spacer()
-                Button {
-                    if recordingManager.isRecording {
-                        stopRecording()
-                    } else {
-                        startRecording()
-                    }
-                } label: {
-                    Circle()
-                        .fill(recordingManager.isRecording ? .red : .white)
-                        .frame(width: 28, height: 28)
-                        .overlay {
-                            if recordingManager.isRecording {
-                                RoundedRectangle(cornerRadius: 4)
-                                    .fill(.white)
-                                    .frame(width: 12, height: 12)
-                            }
-                        }
-                        .padding(6)
-                        .background(.black.opacity(0.5), in: Circle())
-                }
-                .padding(16)
+                recordButton
             }
         }
+        .animation(.easeInOut(duration: 0.25), value: recordingManager.isRecording)
+    }
+
+    private var recordButton: some View {
+        Button {
+            if recordingManager.isRecording {
+                stopRecording()
+            } else {
+                startRecording()
+            }
+        } label: {
+            Circle()
+                .fill(recordingManager.isRecording ? .red : .white)
+                .frame(width: 28, height: 28)
+                .overlay {
+                    if recordingManager.isRecording {
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(.white)
+                            .frame(width: 12, height: 12)
+                    }
+                }
+                .padding(6)
+                .background(.black.opacity(0.5), in: Circle())
+        }
+        .disabled(isTransitioning)
+        .opacity(isTransitioning ? 0.5 : 1)
+        .padding(16)
     }
 
     private func startRecording() {
+        guard !isTransitioning else { return }
+        isTransitioning = true
+
         let peers = connectivity.connectedPeers
         let localName = connectivity.peerID.displayName
         recordingManager.startRecording(localPeerName: localName, remotePeers: peers)
@@ -157,12 +173,19 @@ struct DirectorView: View {
                 recordingManager.appendPeerSample(sampleBuffer, from: peer)
             }
         }
+
+        recordingStartDate = Date()
+        isTransitioning = false
     }
 
     private func stopRecording() {
+        guard !isTransitioning else { return }
+        isTransitioning = true
         videoManager.clearRecordingCallbacks()
         Task {
             _ = await recordingManager.stopRecording()
+            recordingStartDate = nil
+            isTransitioning = false
         }
     }
 
@@ -197,6 +220,36 @@ struct DirectorView: View {
                 }
             }
             .animation(.smooth(duration: 0.35), value: peers)
+        }
+    }
+}
+
+// MARK: - Recording Indicator
+
+private struct RecordingIndicator: View {
+    let startDate: Date
+    @State private var dotVisible = true
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Circle()
+                .fill(.red)
+                .frame(width: 10, height: 10)
+                .opacity(dotVisible ? 1 : 0.3)
+
+            Text(startDate, style: .timer)
+                .font(.caption.monospacedDigit())
+                .fontWeight(.medium)
+        }
+        .foregroundStyle(.white)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(.black.opacity(0.6), in: Capsule())
+        .padding(.top, 8)
+        .onAppear {
+            withAnimation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true)) {
+                dotVisible = false
+            }
         }
     }
 }
