@@ -4,6 +4,7 @@ struct DirectorView: View {
     @Environment(ConnectivityManager.self) private var connectivity
     @Environment(\.scenePhase) private var scenePhase
     @State private var permissionManager = PermissionManager()
+    @State private var videoManager = PeerVideoManager()
 
     var body: some View {
         Group {
@@ -33,50 +34,103 @@ struct DirectorView: View {
     }
 
     private var directorContent: some View {
-        VStack(spacing: 24) {
-            Spacer()
+        ZStack {
+            Color.black.ignoresSafeArea()
 
-            connectionStatusView
-
-            if !connectivity.connectedPeers.isEmpty {
-                connectedPeersList
+            if connectivity.connectedPeers.isEmpty {
+                waitingView
+            } else {
+                videoGrid
             }
-
-            Spacer()
         }
-        .padding()
         .onAppear {
+            connectivity.onFrameReceived = { [videoManager] peer, packet in
+                Task { @MainActor in
+                    videoManager.handleFrame(from: peer, packet: packet)
+                }
+            }
             connectivity.startAdvertising()
         }
         .onDisappear {
+            connectivity.onFrameReceived = nil
             connectivity.stopAdvertising()
+            videoManager.removeAllPeers()
         }
-    }
-
-    private var connectionStatusView: some View {
-        VStack(spacing: 12) {
-            Image(systemName: connectivity.connectedPeers.isEmpty ? "antenna.radiowaves.left.and.right" : "checkmark.circle.fill")
-                .font(.system(size: 48))
-                .foregroundStyle(connectivity.connectedPeers.isEmpty ? .blue : .green)
-                .symbolEffect(.pulse, options: .repeating, isActive: connectivity.connectedPeers.isEmpty)
-
-            Text(connectivity.connectedPeers.isEmpty ? "Waiting for cameras…" : "\(connectivity.connectedPeers.count) camera\(connectivity.connectedPeers.count == 1 ? "" : "s") connected")
-                .font(.title2)
-                .fontWeight(.medium)
-        }
-    }
-
-    private var connectedPeersList: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            ForEach(connectivity.connectedPeers, id: \.self) { peer in
-                HStack {
-                    Image(systemName: "video.fill")
-                        .foregroundStyle(.green)
-                    Text(peer.displayName)
-                }
-                .padding(.horizontal)
+        .onChange(of: connectivity.connectedPeers) { oldPeers, newPeers in
+            let disconnected = oldPeers.filter { !newPeers.contains($0) }
+            for peer in disconnected {
+                videoManager.removePeer(peer)
             }
         }
+    }
+
+    private var waitingView: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "antenna.radiowaves.left.and.right")
+                .font(.system(size: 48))
+                .foregroundStyle(.blue)
+                .symbolEffect(.pulse, options: .repeating)
+
+            Text("Waiting for cameras…")
+                .font(.title2)
+                .fontWeight(.medium)
+                .foregroundStyle(.white)
+        }
+    }
+
+    private var videoGrid: some View {
+        let peers = connectivity.connectedPeers
+        let columns = peers.count <= 1 ? 1 : 2
+
+        return GeometryReader { geometry in
+            let rows = (peers.count + columns - 1) / columns
+            let cellWidth = geometry.size.width / CGFloat(columns)
+            let cellHeight = geometry.size.height / CGFloat(rows)
+
+            LazyVGrid(
+                columns: Array(repeating: GridItem(.fixed(cellWidth), spacing: 0), count: columns),
+                spacing: 0
+            ) {
+                ForEach(peers, id: \.self) { peer in
+                    PeerVideoCell(
+                        peerName: peer.displayName,
+                        frame: videoManager.latestFrames[peer]
+                    )
+                    .frame(width: cellWidth, height: cellHeight)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Video Cell
+
+private struct PeerVideoCell: View {
+    let peerName: String
+    let frame: CGImage?
+
+    var body: some View {
+        ZStack(alignment: .bottomLeading) {
+            if let frame {
+                Image(decorative: frame, scale: 1.0)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+            } else {
+                Color.black
+                ProgressView()
+                    .tint(.white)
+            }
+
+            Text(peerName)
+                .font(.caption)
+                .fontWeight(.medium)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(.black.opacity(0.6), in: RoundedRectangle(cornerRadius: 6))
+                .foregroundStyle(.white)
+                .padding(8)
+        }
+        .clipped()
     }
 }
 

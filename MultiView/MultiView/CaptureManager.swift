@@ -14,7 +14,7 @@ final class CaptureManager: NSObject {
     private(set) var isRunning = false
     private(set) var error: String?
 
-    var onEncodedFrame: (@Sendable (Data, Bool) -> Void)? {
+    var onEncodedFrame: (@Sendable (FramePacket) -> Void)? {
         didSet { encoderBridge.onEncodedFrame = onEncodedFrame }
     }
 
@@ -93,12 +93,12 @@ extension CaptureManager: AVCaptureVideoDataOutputSampleBufferDelegate {
 
 private final class EncoderBridge: @unchecked Sendable {
     private var encoder: VideoEncoder?
-    var onEncodedFrame: (@Sendable (Data, Bool) -> Void)?
+    var onEncodedFrame: (@Sendable (FramePacket) -> Void)?
 
     func start() {
         encoder = VideoEncoder()
-        encoder?.onEncodedFrame = { [weak self] data, isKeyFrame in
-            self?.onEncodedFrame?(data, isKeyFrame)
+        encoder?.onEncodedFrame = { [weak self] packet in
+            self?.onEncodedFrame?(packet)
         }
     }
 

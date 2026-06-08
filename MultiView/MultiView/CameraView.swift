@@ -45,10 +45,14 @@ struct CameraView: View {
             }
         }
         .onAppear {
+            captureManager.onEncodedFrame = { [connectivity] packet in
+                connectivity.sendFrame(packet)
+            }
             captureManager.start()
             connectivity.startBrowsing()
         }
         .onDisappear {
+            captureManager.onEncodedFrame = nil
             captureManager.stop()
             connectivity.stopBrowsing()
         }

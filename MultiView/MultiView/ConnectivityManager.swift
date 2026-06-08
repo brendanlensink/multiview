@@ -37,6 +37,8 @@ final class ConnectivityManager: NSObject {
     private var wasAdvertisingBeforeBackground = false
     private var wasBrowsingBeforeBackground = false
 
+    var onFrameReceived: (@Sendable (MCPeerID, FramePacket) -> Void)?
+
     override init() {
         super.init()
         self.peerID = Self.loadOrCreatePeerID()
@@ -106,6 +108,17 @@ final class ConnectivityManager: NSObject {
         connectedPeers.removeAll()
         discoveredPeers.removeAll()
         connectionState = .idle
+    }
+
+    // MARK: - Data Sending
+
+    nonisolated func sendFrame(_ packet: FramePacket) {
+        let data = packet.serialized()
+        do {
+            try session.send(data, toPeers: session.connectedPeers, with: .unreliable)
+        } catch {
+            logger.error("Failed to send frame: \(error.localizedDescription)")
+        }
     }
 
     // MARK: - App Lifecycle
@@ -213,7 +226,11 @@ extension ConnectivityManager: @preconcurrency MCSessionDelegate {
     }
 
     nonisolated func session(_ session: MCSession, didReceive data: Data, fromPeer peerID: MCPeerID) {
-        logger.debug("Received \(data.count) bytes from \(peerID.displayName)")
+        guard let packet = FramePacket(data: data) else {
+            logger.warning("Received malformed frame (\(data.count) bytes) from \(peerID.displayName)")
+            return
+        }
+        onFrameReceived?(peerID, packet)
     }
 
     nonisolated func session(_ session: MCSession, didReceive stream: InputStream, withName streamName: String, fromPeer peerID: MCPeerID) {

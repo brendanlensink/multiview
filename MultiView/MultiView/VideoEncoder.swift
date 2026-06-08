@@ -5,7 +5,7 @@ final class VideoEncoder: @unchecked Sendable {
     private let logger = Logger(subsystem: "com.multiview", category: "VideoEncoder")
 
     private var compressionSession: VTCompressionSession?
-    var onEncodedFrame: (@Sendable (Data, Bool) -> Void)?
+    var onEncodedFrame: (@Sendable (FramePacket) -> Void)?
 
     init() {
         setupSession()
@@ -90,11 +90,44 @@ final class VideoEncoder: @unchecked Sendable {
 
         guard status == noErr, let pointer = dataPointer else { return }
 
-        let data = Data(bytes: pointer, count: totalLength)
+        let payload = Data(bytes: pointer, count: totalLength)
 
         let attachments = CMSampleBufferGetSampleAttachmentsArray(sampleBuffer, createIfNecessary: false) as? [[CFString: Any]]
         let isKeyFrame = !(attachments?.first?[kCMSampleAttachmentKey_NotSync] as? Bool ?? false)
 
-        onEncodedFrame?(data, isKeyFrame)
+        let pts = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
+        let ptsNanos = UInt64(pts.seconds * 1_000_000_000)
+
+        var parameterSets: Data?
+        if isKeyFrame, let formatDesc = CMSampleBufferGetFormatDescription(sampleBuffer) {
+            parameterSets = Self.extractParameterSets(from: formatDesc)
+        }
+
+        let packet = FramePacket(
+            isKeyFrame: isKeyFrame,
+            presentationTime: ptsNanos,
+            parameterSets: parameterSets,
+            payload: payload
+        )
+        onEncodedFrame?(packet)
+    }
+
+    private static func extractParameterSets(from formatDesc: CMFormatDescription) -> Data? {
+        var count: Int = 0
+        guard CMVideoFormatDescriptionGetH264ParameterSetAtIndex(formatDesc, parameterSetIndex: 0, parameterSetPointerOut: nil, parameterSetSizeOut: nil, parameterSetCountOut: &count, nalUnitHeaderLengthOut: nil) == noErr else {
+            return nil
+        }
+
+        var data = Data()
+        for i in 0..<count {
+            var ptr: UnsafePointer<UInt8>?
+            var size: Int = 0
+            guard CMVideoFormatDescriptionGetH264ParameterSetAtIndex(formatDesc, parameterSetIndex: i, parameterSetPointerOut: &ptr, parameterSetSizeOut: &size, parameterSetCountOut: nil, nalUnitHeaderLengthOut: nil) == noErr,
+                  let ptr else { continue }
+            var len = UInt16(size).bigEndian
+            data.append(Data(bytes: &len, count: 2))
+            data.append(Data(bytes: ptr, count: size))
+        }
+        return data.isEmpty ? nil : data
     }
 }
