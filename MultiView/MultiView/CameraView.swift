@@ -4,6 +4,7 @@ struct CameraView: View {
     @Environment(ConnectivityManager.self) private var connectivity
     @Environment(\.scenePhase) private var scenePhase
     @State private var permissionManager = PermissionManager()
+    @State private var captureManager = CaptureManager()
 
     var body: some View {
         Group {
@@ -33,27 +34,22 @@ struct CameraView: View {
     }
 
     private var cameraContent: some View {
-        VStack(spacing: 24) {
-            Spacer()
+        ZStack {
+            CameraPreviewView(session: captureManager.previewSource)
+                .ignoresSafeArea()
 
-            switch connectivity.connectionState {
-            case .connected:
-                connectedView
-            case .connecting:
-                connectingView
-            case .disconnected:
-                disconnectedView
-            default:
-                browsingView
+            VStack {
+                Spacer()
+                connectionOverlay
+                    .padding()
             }
-
-            Spacer()
         }
-        .padding()
         .onAppear {
+            captureManager.start()
             connectivity.startBrowsing()
         }
         .onDisappear {
+            captureManager.stop()
             connectivity.stopBrowsing()
         }
         .onChange(of: connectivity.connectionState) {
@@ -63,19 +59,55 @@ struct CameraView: View {
         }
     }
 
-    private var browsingView: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 48))
-                .foregroundStyle(.blue)
-                .symbolEffect(.pulse, options: .repeating)
+    @ViewBuilder
+    private var connectionOverlay: some View {
+        switch connectivity.connectionState {
+        case .connected:
+            if let director = connectivity.connectedPeers.first {
+                Label("Connected to \(director.displayName)", systemImage: "checkmark.circle.fill")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(.ultraThinMaterial, in: Capsule())
+            }
+        case .connecting:
+            HStack(spacing: 8) {
+                ProgressView()
+                Text("Connecting…")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(.ultraThinMaterial, in: Capsule())
+        case .disconnected:
+            VStack(spacing: 8) {
+                Label("Disconnected", systemImage: "wifi.slash")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
 
-            Text("Looking for directors…")
-                .font(.title2)
-                .fontWeight(.medium)
+                Text("Reconnecting automatically…")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
 
-            if !connectivity.discoveredPeers.isEmpty {
-                VStack(spacing: 8) {
+                Button("Reconnect Now") {
+                    connectivity.startBrowsing()
+                }
+                .font(.subheadline)
+                .buttonStyle(.borderedProminent)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+        default:
+            VStack(spacing: 12) {
+                if connectivity.discoveredPeers.isEmpty {
+                    Label("Looking for directors…", systemImage: "magnifyingglass")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .symbolEffect(.pulse, options: .repeating)
+                } else {
                     ForEach(connectivity.discoveredPeers, id: \.self) { peer in
                         Button {
                             connectivity.invitePeer(peer)
@@ -86,60 +118,17 @@ struct CameraView: View {
                                 Spacer()
                                 Image(systemName: "arrow.right.circle.fill")
                             }
-                            .padding()
-                            .background(.blue.opacity(0.1))
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .font(.subheadline)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 10)
                         }
                         .buttonStyle(.plain)
                     }
                 }
             }
-        }
-    }
-
-    private var connectingView: some View {
-        VStack(spacing: 12) {
-            ProgressView()
-                .controlSize(.large)
-
-            Text("Connecting…")
-                .font(.title2)
-                .fontWeight(.medium)
-        }
-    }
-
-    private var connectedView: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 48))
-                .foregroundStyle(.green)
-
-            if let director = connectivity.connectedPeers.first {
-                Text("Connected to \(director.displayName)")
-                    .font(.title2)
-                    .fontWeight(.medium)
-            }
-        }
-    }
-
-    private var disconnectedView: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "wifi.slash")
-                .font(.system(size: 48))
-                .foregroundStyle(.red)
-
-            Text("Disconnected")
-                .font(.title2)
-                .fontWeight(.medium)
-
-            Text("Reconnecting automatically…")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-
-            Button("Reconnect Now") {
-                connectivity.startBrowsing()
-            }
-            .buttonStyle(.borderedProminent)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
         }
     }
 }

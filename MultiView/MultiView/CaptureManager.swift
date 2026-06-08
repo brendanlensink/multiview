@@ -1,0 +1,129 @@
+import AVFoundation
+import Observation
+import os
+
+@MainActor @Observable
+final class CaptureManager: NSObject {
+    private nonisolated let logger = Logger(subsystem: "com.multiview", category: "Capture")
+
+    private let captureSession = AVCaptureSession()
+    private let videoOutput = AVCaptureVideoDataOutput()
+    private let outputQueue = DispatchQueue(label: "com.multiview.capture-output")
+    private nonisolated let encoderBridge = EncoderBridge()
+
+    private(set) var isRunning = false
+    private(set) var error: String?
+
+    var onEncodedFrame: (@Sendable (Data, Bool) -> Void)? {
+        didSet { encoderBridge.onEncodedFrame = onEncodedFrame }
+    }
+
+    var previewSource: AVCaptureSession { captureSession }
+
+    func start() {
+        guard !isRunning else { return }
+
+        do {
+            try configureCaptureSession()
+            encoderBridge.start()
+            captureSession.startRunning()
+            isRunning = true
+            logger.info("Capture session started")
+        } catch {
+            self.error = error.localizedDescription
+            logger.error("Failed to start capture session: \(error.localizedDescription)")
+        }
+    }
+
+    func stop() {
+        captureSession.stopRunning()
+        encoderBridge.stop()
+        isRunning = false
+        logger.info("Capture session stopped")
+    }
+
+    private func configureCaptureSession() throws {
+        captureSession.beginConfiguration()
+        defer { captureSession.commitConfiguration() }
+
+        captureSession.sessionPreset = .hd1280x720
+
+        guard let camera = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back) else {
+            throw CaptureError.noCameraAvailable
+        }
+
+        let input = try AVCaptureDeviceInput(device: camera)
+        guard captureSession.canAddInput(input) else {
+            throw CaptureError.cannotAddInput
+        }
+        captureSession.addInput(input)
+
+        videoOutput.alwaysDiscardsLateVideoFrames = true
+        videoOutput.videoSettings = [
+            kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange
+        ]
+        videoOutput.setSampleBufferDelegate(self, queue: outputQueue)
+
+        guard captureSession.canAddOutput(videoOutput) else {
+            throw CaptureError.cannotAddOutput
+        }
+        captureSession.addOutput(videoOutput)
+
+        if let connection = videoOutput.connection(with: .video) {
+            connection.videoRotationAngle = 90
+        }
+    }
+}
+
+// MARK: - AVCaptureVideoDataOutputSampleBufferDelegate
+
+extension CaptureManager: AVCaptureVideoDataOutputSampleBufferDelegate {
+    nonisolated func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
+        guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
+        let presentationTime = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
+        encoderBridge.encode(pixelBuffer: pixelBuffer, presentationTime: presentationTime)
+    }
+
+    nonisolated func captureOutput(_ output: AVCaptureOutput, didDrop sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
+        logger.debug("Dropped frame")
+    }
+}
+
+// MARK: - EncoderBridge
+
+private final class EncoderBridge: @unchecked Sendable {
+    private var encoder: VideoEncoder?
+    var onEncodedFrame: (@Sendable (Data, Bool) -> Void)?
+
+    func start() {
+        encoder = VideoEncoder()
+        encoder?.onEncodedFrame = { [weak self] data, isKeyFrame in
+            self?.onEncodedFrame?(data, isKeyFrame)
+        }
+    }
+
+    func stop() {
+        encoder?.invalidate()
+        encoder = nil
+    }
+
+    func encode(pixelBuffer: CVPixelBuffer, presentationTime: CMTime) {
+        encoder?.encode(pixelBuffer: pixelBuffer, presentationTime: presentationTime)
+    }
+}
+
+// MARK: - Errors
+
+enum CaptureError: LocalizedError {
+    case noCameraAvailable
+    case cannotAddInput
+    case cannotAddOutput
+
+    var errorDescription: String? {
+        switch self {
+        case .noCameraAvailable: "No back camera available"
+        case .cannotAddInput: "Cannot add camera input to session"
+        case .cannotAddOutput: "Cannot add video output to session"
+        }
+    }
+}
