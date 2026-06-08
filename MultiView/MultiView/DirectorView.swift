@@ -46,6 +46,8 @@ struct DirectorView: View {
     @State private var localDisplayLayer = SampleBufferDisplayLayer()
     @State private var isTransitioning = false
     @State private var recordingStartDate: Date?
+    @State private var isExporting = false
+    @State private var exportError: String?
 
     var body: some View {
         Group {
@@ -84,6 +86,17 @@ struct DirectorView: View {
             Color.black.ignoresSafeArea()
             videoGrid
             recordingOverlay
+            if isExporting {
+                exportingOverlay
+            }
+        }
+        .alert("Export Failed", isPresented: .init(
+            get: { exportError != nil },
+            set: { if !$0 { exportError = nil } }
+        )) {
+            Button("OK") { exportError = nil }
+        } message: {
+            Text(exportError ?? "")
         }
         .onAppear {
             captureManager.onRawSampleBuffer = { [localDisplayLayer, recordingManager] sampleBuffer in
@@ -173,8 +186,8 @@ struct DirectorView: View {
                 .padding(6)
                 .background(.black.opacity(0.5), in: Circle())
         }
-        .disabled(isTransitioning)
-        .opacity(isTransitioning ? 0.5 : 1)
+        .disabled(isTransitioning || isExporting)
+        .opacity(isTransitioning || isExporting ? 0.5 : 1)
         .padding(16)
     }
 
@@ -201,10 +214,36 @@ struct DirectorView: View {
         isTransitioning = true
         videoManager.clearRecordingCallbacks()
         Task {
-            _ = await recordingManager.stopRecording()
+            let session = await recordingManager.stopRecording()
             recordingStartDate = nil
             isTransitioning = false
+
+            guard let session else { return }
+            isExporting = true
+            do {
+                try await PhotosExporter.exportSession(session)
+            } catch {
+                exportError = error.localizedDescription
+            }
+            isExporting = false
         }
+    }
+
+    private var exportingOverlay: some View {
+        ZStack {
+            Color.black.opacity(0.5).ignoresSafeArea()
+            VStack(spacing: 12) {
+                ProgressView()
+                    .tint(.white)
+                    .controlSize(.large)
+                Text("Saving to Photos…")
+                    .font(.headline)
+                    .foregroundStyle(.white)
+            }
+            .padding(24)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+        }
+        .transition(.opacity)
     }
 
     private var videoGrid: some View {

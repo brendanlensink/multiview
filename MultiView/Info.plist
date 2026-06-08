@@ -8,6 +8,8 @@
 	<string>MultiView needs microphone access to record audio on the director device.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>MultiView needs local network access to connect devices for multi-angle video capture.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>MultiView needs photo library access to save your recordings.</string>
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_multiview._tcp</string>
