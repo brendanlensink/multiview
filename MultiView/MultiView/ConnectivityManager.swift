@@ -21,6 +21,7 @@ final class ConnectivityManager: NSObject {
     private static let serviceType = "multiview"
     private static let peerIDKey = "multiview-peer-id"
     private static let displayNameKey = "multiview-display-name"
+    private static let reconnectDelay: TimeInterval = 2
 
     private nonisolated let logger = Logger(subsystem: "com.multiview", category: "Connectivity")
 
@@ -32,6 +33,9 @@ final class ConnectivityManager: NSObject {
     nonisolated(unsafe) private(set) var session: MCSession!
     private var advertiser: MCNearbyServiceAdvertiser?
     private var browser: MCNearbyServiceBrowser?
+    private var reconnectTask: Task<Void, Never>?
+    private var wasAdvertisingBeforeBackground = false
+    private var wasBrowsingBeforeBackground = false
 
     override init() {
         super.init()
@@ -44,6 +48,8 @@ final class ConnectivityManager: NSObject {
 
     func startAdvertising() {
         guard advertiser == nil else { return }
+        reconnectTask?.cancel()
+        reconnectTask = nil
         let advertiser = MCNearbyServiceAdvertiser(peer: peerID, discoveryInfo: nil, serviceType: Self.serviceType)
         advertiser.delegate = self
         advertiser.startAdvertisingPeer()
@@ -64,6 +70,8 @@ final class ConnectivityManager: NSObject {
 
     func startBrowsing() {
         guard browser == nil else { return }
+        reconnectTask?.cancel()
+        reconnectTask = nil
         let browser = MCNearbyServiceBrowser(peer: peerID, serviceType: Self.serviceType)
         browser.delegate = self
         browser.startBrowsingForPeers()
@@ -90,12 +98,52 @@ final class ConnectivityManager: NSObject {
     }
 
     func disconnect() {
+        reconnectTask?.cancel()
+        reconnectTask = nil
         session.disconnect()
         stopAdvertising()
         stopBrowsing()
         connectedPeers.removeAll()
         discoveredPeers.removeAll()
         connectionState = .idle
+    }
+
+    // MARK: - App Lifecycle
+
+    func handleAppBackgrounded() {
+        wasAdvertisingBeforeBackground = advertiser != nil
+        wasBrowsingBeforeBackground = browser != nil
+        reconnectTask?.cancel()
+        reconnectTask = nil
+        stopAdvertising()
+        stopBrowsing()
+        logger.info("Suspended connectivity for background")
+    }
+
+    func handleAppForegrounded() {
+        if wasAdvertisingBeforeBackground {
+            startAdvertising()
+            wasAdvertisingBeforeBackground = false
+        }
+        if wasBrowsingBeforeBackground {
+            startBrowsing()
+            wasBrowsingBeforeBackground = false
+        }
+        if connectionState == .disconnected {
+            scheduleReconnect()
+        }
+        logger.info("Resumed connectivity for foreground")
+    }
+
+    // MARK: - Reconnection
+
+    private func scheduleReconnect() {
+        reconnectTask?.cancel()
+        reconnectTask = Task {
+            try? await Task.sleep(for: .seconds(Self.reconnectDelay))
+            guard !Task.isCancelled else { return }
+            startBrowsing()
+        }
     }
 
     // MARK: - Peer ID Persistence
@@ -138,7 +186,12 @@ extension ConnectivityManager: @preconcurrency MCSessionDelegate {
                 let wasConnected = self.connectedPeers.contains(peer)
                 self.connectedPeers.removeAll { $0 == peer }
                 if self.connectedPeers.isEmpty {
-                    self.connectionState = wasConnected ? .disconnected : .idle
+                    if wasConnected {
+                        self.connectionState = .disconnected
+                        self.scheduleReconnect()
+                    } else {
+                        self.connectionState = .idle
+                    }
                 }
             case .connecting:
                 self.logger.info("\(peer.displayName) connecting...")
@@ -147,6 +200,8 @@ extension ConnectivityManager: @preconcurrency MCSessionDelegate {
                 }
             case .connected:
                 self.logger.info("\(peer.displayName) connected")
+                self.reconnectTask?.cancel()
+                self.reconnectTask = nil
                 if !self.connectedPeers.contains(peer) {
                     self.connectedPeers.append(peer)
                 }

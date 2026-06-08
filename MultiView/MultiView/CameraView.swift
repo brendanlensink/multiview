@@ -25,6 +25,9 @@ struct CameraView: View {
         .onChange(of: scenePhase) {
             if scenePhase == .active {
                 permissionManager.refreshStatuses()
+                connectivity.handleAppForegrounded()
+            } else if scenePhase == .background {
+                connectivity.handleAppBackgrounded()
             }
         }
     }
@@ -129,7 +132,11 @@ struct CameraView: View {
                 .font(.title2)
                 .fontWeight(.medium)
 
-            Button("Reconnect") {
+            Text("Reconnecting automatically…")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+            Button("Reconnect Now") {
                 connectivity.startBrowsing()
             }
             .buttonStyle(.borderedProminent)
