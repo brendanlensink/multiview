@@ -45,8 +45,11 @@ struct CameraView: View {
             }
         }
         .onAppear {
-            captureManager.onEncodedFrame = { [connectivity] packet in
-                connectivity.sendFrame(packet)
+            let sender = FrameSender { [connectivity] packet, mode in
+                connectivity.sendFrame(packet, mode: mode)
+            }
+            captureManager.onEncodedFrame = { packet in
+                sender.enqueue(packet)
             }
             captureManager.start()
             connectivity.startBrowsing()

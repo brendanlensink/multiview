@@ -112,10 +112,11 @@ final class ConnectivityManager: NSObject {
 
     // MARK: - Data Sending
 
-    nonisolated func sendFrame(_ packet: FramePacket) {
+    nonisolated func sendFrame(_ packet: FramePacket, mode: FrameSender.SendMode) {
         let data = packet.serialized()
+        let reliability: MCSessionSendDataMode = mode == .reliable ? .reliable : .unreliable
         do {
-            try session.send(data, toPeers: session.connectedPeers, with: .unreliable)
+            try session.send(data, toPeers: session.connectedPeers, with: reliability)
         } catch {
             logger.error("Failed to send frame: \(error.localizedDescription)")
         }
