@@ -26,6 +26,9 @@ struct CameraView: View {
         .onChange(of: scenePhase) {
             if scenePhase == .active {
                 permissionManager.refreshStatuses()
+                connectivity.handleAppForegrounded()
+            } else if scenePhase == .background {
+                connectivity.handleAppBackgrounded()
             }
         }
     }
@@ -58,7 +61,8 @@ struct CameraView: View {
 
     @ViewBuilder
     private var connectionOverlay: some View {
-        if connectivity.connectionState == .connected {
+        switch connectivity.connectionState {
+        case .connected:
             if let director = connectivity.connectedPeers.first {
                 Label("Connected to \(director.displayName)", systemImage: "checkmark.circle.fill")
                     .font(.subheadline)
@@ -67,7 +71,36 @@ struct CameraView: View {
                     .padding(.vertical, 10)
                     .background(.ultraThinMaterial, in: Capsule())
             }
-        } else {
+        case .connecting:
+            HStack(spacing: 8) {
+                ProgressView()
+                Text("Connecting…")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(.ultraThinMaterial, in: Capsule())
+        case .disconnected:
+            VStack(spacing: 8) {
+                Label("Disconnected", systemImage: "wifi.slash")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+
+                Text("Reconnecting automatically…")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Button("Reconnect Now") {
+                    connectivity.startBrowsing()
+                }
+                .font(.subheadline)
+                .buttonStyle(.borderedProminent)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+        default:
             VStack(spacing: 12) {
                 if connectivity.discoveredPeers.isEmpty {
                     Label("Looking for directors…", systemImage: "magnifyingglass")

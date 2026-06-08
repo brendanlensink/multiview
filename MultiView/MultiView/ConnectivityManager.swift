@@ -7,7 +7,9 @@ enum ConnectionState: Equatable, Sendable {
     case idle
     case advertising
     case browsing
+    case connecting
     case connected
+    case disconnected
 }
 
 private struct SendablePeer: @unchecked Sendable {
@@ -19,6 +21,7 @@ final class ConnectivityManager: NSObject {
     private static let serviceType = "multiview"
     private static let peerIDKey = "multiview-peer-id"
     private static let displayNameKey = "multiview-display-name"
+    private static let reconnectDelay: TimeInterval = 2
 
     private nonisolated let logger = Logger(subsystem: "com.multiview", category: "Connectivity")
 
@@ -30,6 +33,9 @@ final class ConnectivityManager: NSObject {
     nonisolated(unsafe) private(set) var session: MCSession!
     private var advertiser: MCNearbyServiceAdvertiser?
     private var browser: MCNearbyServiceBrowser?
+    private var reconnectTask: Task<Void, Never>?
+    private var wasAdvertisingBeforeBackground = false
+    private var wasBrowsingBeforeBackground = false
 
     override init() {
         super.init()
@@ -42,6 +48,8 @@ final class ConnectivityManager: NSObject {
 
     func startAdvertising() {
         guard advertiser == nil else { return }
+        reconnectTask?.cancel()
+        reconnectTask = nil
         let advertiser = MCNearbyServiceAdvertiser(peer: peerID, discoveryInfo: nil, serviceType: Self.serviceType)
         advertiser.delegate = self
         advertiser.startAdvertisingPeer()
@@ -62,6 +70,8 @@ final class ConnectivityManager: NSObject {
 
     func startBrowsing() {
         guard browser == nil else { return }
+        reconnectTask?.cancel()
+        reconnectTask = nil
         let browser = MCNearbyServiceBrowser(peer: peerID, serviceType: Self.serviceType)
         browser.delegate = self
         browser.startBrowsingForPeers()
@@ -74,7 +84,7 @@ final class ConnectivityManager: NSObject {
         browser?.stopBrowsingForPeers()
         browser = nil
         discoveredPeers.removeAll()
-        if connectionState == .browsing {
+        if connectionState == .browsing || connectionState == .connecting {
             connectionState = connectedPeers.isEmpty ? .idle : .connected
         }
     }
@@ -83,16 +93,57 @@ final class ConnectivityManager: NSObject {
 
     func invitePeer(_ peer: MCPeerID) {
         browser?.invitePeer(peer, to: session, withContext: nil, timeout: 30)
+        connectionState = .connecting
         logger.info("Sent invitation to \(peer.displayName)")
     }
 
     func disconnect() {
+        reconnectTask?.cancel()
+        reconnectTask = nil
         session.disconnect()
         stopAdvertising()
         stopBrowsing()
         connectedPeers.removeAll()
         discoveredPeers.removeAll()
         connectionState = .idle
+    }
+
+    // MARK: - App Lifecycle
+
+    func handleAppBackgrounded() {
+        wasAdvertisingBeforeBackground = advertiser != nil
+        wasBrowsingBeforeBackground = browser != nil
+        reconnectTask?.cancel()
+        reconnectTask = nil
+        stopAdvertising()
+        stopBrowsing()
+        logger.info("Suspended connectivity for background")
+    }
+
+    func handleAppForegrounded() {
+        if wasAdvertisingBeforeBackground {
+            startAdvertising()
+            wasAdvertisingBeforeBackground = false
+        }
+        if wasBrowsingBeforeBackground {
+            startBrowsing()
+            wasBrowsingBeforeBackground = false
+        }
+        if connectionState == .disconnected {
+            scheduleReconnect()
+        }
+        logger.info("Resumed connectivity for foreground")
+    }
+
+    // MARK: - Reconnection
+
+    private func scheduleReconnect() {
+        reconnectTask?.cancel()
+        reconnectTask = Task {
+            try? await Task.sleep(for: .seconds(Self.reconnectDelay))
+            guard !Task.isCancelled else { return }
+            startBrowsing()
+        }
     }
 
     // MARK: - Peer ID Persistence
@@ -132,12 +183,25 @@ extension ConnectivityManager: @preconcurrency MCSessionDelegate {
             switch state {
             case .notConnected:
                 self.logger.info("\(peer.displayName) disconnected")
+                let wasConnected = self.connectedPeers.contains(peer)
                 self.connectedPeers.removeAll { $0 == peer }
-                self.connectionState = self.connectedPeers.isEmpty ? .idle : .connected
+                if self.connectedPeers.isEmpty {
+                    if wasConnected {
+                        self.connectionState = .disconnected
+                        self.scheduleReconnect()
+                    } else {
+                        self.connectionState = .idle
+                    }
+                }
             case .connecting:
                 self.logger.info("\(peer.displayName) connecting...")
+                if self.connectionState == .browsing || self.connectionState == .idle {
+                    self.connectionState = .connecting
+                }
             case .connected:
                 self.logger.info("\(peer.displayName) connected")
+                self.reconnectTask?.cancel()
+                self.reconnectTask = nil
                 if !self.connectedPeers.contains(peer) {
                     self.connectedPeers.append(peer)
                 }
