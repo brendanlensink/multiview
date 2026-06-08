@@ -25,6 +25,9 @@ struct DirectorView: View {
         .onChange(of: scenePhase) {
             if scenePhase == .active {
                 permissionManager.refreshStatuses()
+                connectivity.handleAppForegrounded()
+            } else if scenePhase == .background {
+                connectivity.handleAppBackgrounded()
             }
         }
     }
