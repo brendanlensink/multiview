@@ -16,7 +16,7 @@ private struct SendablePeer: @unchecked Sendable {
 
 @MainActor @Observable
 final class ConnectivityManager: NSObject {
-    private static let serviceType = "multiview-stream"
+    private static let serviceType = "multiview"
     private static let peerIDKey = "multiview-peer-id"
     private static let displayNameKey = "multiview-display-name"
 
