@@ -2,14 +2,17 @@ import AVFoundation
 import MultipeerConnectivity
 import os
 import SwiftUI
+import UIKit
 
 @MainActor @Observable
 final class RecordingManager {
     private let logger = Logger(subsystem: "com.multiview", category: "Recording")
 
     private(set) var isRecording = false
+    private(set) var lostStreamCount = 0
     private let activeRecorders = ActiveRecorders()
     private var sessionStartTime: CMTime = .zero
+    private var backgroundTaskID: UIBackgroundTaskIdentifier = .invalid
 
     private static let localStreamID = "director"
 
@@ -28,6 +31,7 @@ final class RecordingManager {
         }
 
         sessionStartTime = CMClockGetTime(CMClockGetHostTimeClock())
+        lostStreamCount = 0
         logger.info("Recording session starting at \(self.sessionStartTime.seconds)s")
 
         do {
@@ -68,6 +72,7 @@ final class RecordingManager {
     func stopRecording() async -> [URL] {
         guard isRecording else { return [] }
         isRecording = false
+        lostStreamCount = 0
 
         let recorders = activeRecorders.removeAll()
 
@@ -80,6 +85,58 @@ final class RecordingManager {
 
         logger.info("Recording stopped, \(outputURLs.count) files saved")
         return outputURLs
+    }
+
+    func finalizePeerStream(_ peer: MCPeerID) {
+        guard isRecording else { return }
+        let streamID = peer.displayName
+        guard let recorder = activeRecorders.remove(for: streamID) else { return }
+
+        lostStreamCount += 1
+        logger.info("Finalizing disconnected peer stream '\(streamID)'")
+
+        Task.detached {
+            if let url = await recorder.finish() {
+                Logger(subsystem: "com.multiview", category: "Recording")
+                    .info("Saved partial recording for '\(streamID)' at \(url.lastPathComponent)")
+            }
+        }
+    }
+
+    func finalizeLocalStream() {
+        guard isRecording else { return }
+        guard let recorder = activeRecorders.remove(for: Self.localStreamID) else { return }
+
+        lostStreamCount += 1
+        logger.info("Finalizing local stream due to capture interruption")
+
+        Task.detached {
+            _ = await recorder.finish()
+        }
+    }
+
+    func finalizeAllForBackground() {
+        guard isRecording else { return }
+
+        let app = UIApplication.shared
+        backgroundTaskID = app.beginBackgroundTask { [weak self] in
+            self?.logger.warning("Background task expired before recording finalization completed")
+            self?.endBackgroundTask()
+        }
+
+        isRecording = false
+        let recorders = activeRecorders.removeAll()
+        logger.info("Finalizing \(recorders.count) streams for app backgrounding")
+
+        Task.detached { [weak self] in
+            for recorder in recorders {
+                _ = await recorder.finish()
+            }
+            await MainActor.run {
+                self?.lostStreamCount = 0
+                self?.endBackgroundTask()
+            }
+        }
     }
 
     nonisolated func appendLocalSample(_ sampleBuffer: CMSampleBuffer) {
@@ -95,6 +152,13 @@ final class RecordingManager {
     }
 
     // MARK: - Private
+
+    private func endBackgroundTask() {
+        guard backgroundTaskID != .invalid else { return }
+        UIApplication.shared.endBackgroundTask(backgroundTaskID)
+        backgroundTaskID = .invalid
+        logger.info("Background finalization complete")
+    }
 
     private static func sanitize(_ name: String) -> String {
         let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_"))
@@ -120,6 +184,10 @@ private final class ActiveRecorders: Sendable {
 
     func recorder(for key: String) -> StreamRecorder? {
         lock.withLock { storage[key] }
+    }
+
+    func remove(for key: String) -> StreamRecorder? {
+        lock.withLock { storage.removeValue(forKey: key) }
     }
 
     func removeAll() -> [StreamRecorder] {

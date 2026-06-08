@@ -43,6 +43,14 @@ final class StreamRecorder: @unchecked Sendable {
             queue.async { [self] in
                 guard started else {
                     logger.info("Stream '\(self.streamName)' had no samples, skipping finalization")
+                    cleanupFile()
+                    continuation.resume(returning: nil)
+                    return
+                }
+
+                guard assetWriter.status == .writing else {
+                    logger.error("Asset writer for '\(self.streamName)' in unexpected state: \(self.assetWriter.status.rawValue)")
+                    cleanupFile()
                     continuation.resume(returning: nil)
                     return
                 }
@@ -55,6 +63,7 @@ final class StreamRecorder: @unchecked Sendable {
                         continuation.resume(returning: outputURL)
                     } else {
                         logger.error("Failed to finish stream '\(self.streamName)': \(self.assetWriter.error?.localizedDescription ?? "unknown")")
+                        cleanupFile()
                         continuation.resume(returning: nil)
                     }
                 }
@@ -155,5 +164,9 @@ final class StreamRecorder: @unchecked Sendable {
         assetWriter.startWriting()
         assetWriter.startSession(atSourceTime: sessionStartTime)
         started = true
+    }
+
+    private func cleanupFile() {
+        try? FileManager.default.removeItem(at: outputURL)
     }
 }
