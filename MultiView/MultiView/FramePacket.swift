@@ -1,14 +1,22 @@
 import Foundation
 
+enum WireMessageType: UInt8 {
+    case frame = 0x01
+    case syncPing = 0x02
+    case syncPong = 0x03
+}
+
 struct FramePacket {
     let isKeyFrame: Bool
-    let presentationTime: UInt64
+    var presentationTime: UInt64
     let parameterSets: Data?
     let payload: Data
 
     func serialized() -> Data {
         let paramSets = parameterSets ?? Data()
-        var data = Data(capacity: 11 + paramSets.count + payload.count)
+        var data = Data(capacity: 12 + paramSets.count + payload.count)
+
+        data.append(WireMessageType.frame.rawValue)
 
         var flags: UInt8 = 0
         if isKeyFrame { flags |= 0x01 }

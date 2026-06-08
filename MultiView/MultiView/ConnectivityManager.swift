@@ -36,6 +36,9 @@ final class ConnectivityManager: NSObject {
     private var reconnectTask: Task<Void, Never>?
     private var wasAdvertisingBeforeBackground = false
     private var wasBrowsingBeforeBackground = false
+    private var isDirector = false
+
+    nonisolated(unsafe) private(set) var timeSync: TimeSyncManager!
 
     var onFrameReceived: (@Sendable (MCPeerID, FramePacket) -> Void)?
 
@@ -43,6 +46,14 @@ final class ConnectivityManager: NSObject {
         super.init()
         self.peerID = Self.loadOrCreatePeerID()
         self.session = MCSession(peer: peerID, securityIdentity: nil, encryptionPreference: .required)
+        self.timeSync = TimeSyncManager { [weak self] data, peer in
+            guard let session = self?.session else { return }
+            do {
+                try session.send(data, toPeers: [peer], with: .reliable)
+            } catch {
+                self?.logger.error("Failed to send sync message: \(error.localizedDescription)")
+            }
+        }
         session.delegate = self
     }
 
@@ -50,6 +61,7 @@ final class ConnectivityManager: NSObject {
 
     func startAdvertising() {
         guard advertiser == nil else { return }
+        isDirector = true
         reconnectTask?.cancel()
         reconnectTask = nil
         let advertiser = MCNearbyServiceAdvertiser(peer: peerID, discoveryInfo: nil, serviceType: Self.serviceType)
@@ -72,6 +84,7 @@ final class ConnectivityManager: NSObject {
 
     func startBrowsing() {
         guard browser == nil else { return }
+        isDirector = false
         reconnectTask?.cancel()
         reconnectTask = nil
         let browser = MCNearbyServiceBrowser(peer: peerID, serviceType: Self.serviceType)
@@ -102,6 +115,7 @@ final class ConnectivityManager: NSObject {
     func disconnect() {
         reconnectTask?.cancel()
         reconnectTask = nil
+        timeSync.stopAll()
         session.disconnect()
         stopAdvertising()
         stopBrowsing()
@@ -129,6 +143,7 @@ final class ConnectivityManager: NSObject {
         wasBrowsingBeforeBackground = browser != nil
         reconnectTask?.cancel()
         reconnectTask = nil
+        timeSync.stopAll()
         stopAdvertising()
         stopBrowsing()
         logger.info("Suspended connectivity for background")
@@ -199,6 +214,7 @@ extension ConnectivityManager: @preconcurrency MCSessionDelegate {
                 self.logger.info("\(peer.displayName) disconnected")
                 let wasConnected = self.connectedPeers.contains(peer)
                 self.connectedPeers.removeAll { $0 == peer }
+                self.timeSync.stopSync(with: peer)
                 if self.connectedPeers.isEmpty {
                     if wasConnected {
                         self.connectionState = .disconnected
@@ -220,6 +236,9 @@ extension ConnectivityManager: @preconcurrency MCSessionDelegate {
                     self.connectedPeers.append(peer)
                 }
                 self.connectionState = .connected
+                if self.isDirector {
+                    self.timeSync.startSync(with: peer)
+                }
             @unknown default:
                 break
             }
@@ -227,11 +246,36 @@ extension ConnectivityManager: @preconcurrency MCSessionDelegate {
     }
 
     nonisolated func session(_ session: MCSession, didReceive data: Data, fromPeer peerID: MCPeerID) {
-        guard let packet = FramePacket(data: data) else {
-            logger.warning("Received malformed frame (\(data.count) bytes) from \(peerID.displayName)")
+        guard let typeByte = data.first, let messageType = WireMessageType(rawValue: typeByte) else {
+            logger.warning("Received unknown message (\(data.count) bytes) from \(peerID.displayName)")
             return
         }
-        onFrameReceived?(peerID, packet)
+
+        let payload = data.dropFirst()
+
+        switch messageType {
+        case .frame:
+            guard var packet = FramePacket(data: Data(payload)) else {
+                logger.warning("Received malformed frame (\(data.count) bytes) from \(peerID.displayName)")
+                return
+            }
+            packet.presentationTime = timeSync.adjustedPresentationTime(packet.presentationTime, from: peerID)
+            onFrameReceived?(peerID, packet)
+
+        case .syncPing:
+            guard let ping = SyncPing(data: Data(payload)) else {
+                logger.warning("Received malformed sync ping from \(peerID.displayName)")
+                return
+            }
+            timeSync.handlePing(ping, from: peerID)
+
+        case .syncPong:
+            guard let pong = SyncPong(data: Data(payload)) else {
+                logger.warning("Received malformed sync pong from \(peerID.displayName)")
+                return
+            }
+            timeSync.handlePong(pong)
+        }
     }
 
     nonisolated func session(_ session: MCSession, didReceive stream: InputStream, withName streamName: String, fromPeer peerID: MCPeerID) {
