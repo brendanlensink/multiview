@@ -36,6 +36,7 @@ final class RecordingManager {
                 streamName: localPeerName,
                 outputURL: localURL,
                 isPassthrough: false,
+                includeAudio: true,
                 sessionStartTime: sessionStartTime
             )
             activeRecorders.set(localRecorder, for: Self.localStreamID)
@@ -51,6 +52,7 @@ final class RecordingManager {
                     streamName: streamID,
                     outputURL: url,
                     isPassthrough: true,
+                    includeAudio: false,
                     sessionStartTime: sessionStartTime
                 )
                 activeRecorders.set(recorder, for: streamID)
@@ -81,11 +83,15 @@ final class RecordingManager {
     }
 
     nonisolated func appendLocalSample(_ sampleBuffer: CMSampleBuffer) {
-        activeRecorders.recorder(for: "director")?.append(sampleBuffer)
+        activeRecorders.recorder(for: "director")?.appendVideo(sampleBuffer)
+    }
+
+    nonisolated func appendLocalAudio(_ sampleBuffer: CMSampleBuffer) {
+        activeRecorders.recorder(for: "director")?.appendAudio(sampleBuffer)
     }
 
     nonisolated func appendPeerSample(_ sampleBuffer: CMSampleBuffer, from peer: MCPeerID) {
-        activeRecorders.recorder(for: peer.displayName)?.append(sampleBuffer)
+        activeRecorders.recorder(for: peer.displayName)?.appendVideo(sampleBuffer)
     }
 
     // MARK: - Private

@@ -82,6 +82,9 @@ struct DirectorView: View {
                 localDisplayLayer.enqueue(sampleBuffer)
                 recordingManager.appendLocalSample(sampleBuffer)
             }
+            captureManager.onAudioSampleBuffer = { [recordingManager] sampleBuffer in
+                recordingManager.appendLocalAudio(sampleBuffer)
+            }
             captureManager.start()
 
             connectivity.onFrameReceived = { [videoManager] peer, packet in
@@ -99,6 +102,7 @@ struct DirectorView: View {
             }
 
             captureManager.onRawSampleBuffer = nil
+            captureManager.onAudioSampleBuffer = nil
             captureManager.stop()
 
             connectivity.onFrameReceived = nil

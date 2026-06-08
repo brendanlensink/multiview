@@ -6,25 +6,35 @@ final class StreamRecorder: @unchecked Sendable {
 
     private let assetWriter: AVAssetWriter
     private var videoInput: AVAssetWriterInput?
+    private var audioInput: AVAssetWriterInput?
     private let outputURL: URL
     private let queue = DispatchQueue(label: "com.multiview.stream-recorder")
     private let isPassthrough: Bool
+    private let includeAudio: Bool
     private var started = false
     private var sessionStartTime: CMTime
 
     let streamName: String
 
-    init(streamName: String, outputURL: URL, isPassthrough: Bool, sessionStartTime: CMTime) throws {
+    init(streamName: String, outputURL: URL, isPassthrough: Bool, includeAudio: Bool, sessionStartTime: CMTime) throws {
         self.streamName = streamName
         self.outputURL = outputURL
         self.isPassthrough = isPassthrough
+        self.includeAudio = includeAudio
         self.sessionStartTime = sessionStartTime
         self.assetWriter = try AVAssetWriter(url: outputURL, fileType: .mov)
     }
 
-    func append(_ sampleBuffer: CMSampleBuffer) {
+    func appendVideo(_ sampleBuffer: CMSampleBuffer) {
         queue.async { [self] in
-            _append(sampleBuffer)
+            _appendVideo(sampleBuffer)
+        }
+    }
+
+    func appendAudio(_ sampleBuffer: CMSampleBuffer) {
+        guard includeAudio else { return }
+        queue.async { [self] in
+            _appendAudio(sampleBuffer)
         }
     }
 
@@ -38,6 +48,7 @@ final class StreamRecorder: @unchecked Sendable {
                 }
 
                 videoInput?.markAsFinished()
+                audioInput?.markAsFinished()
                 assetWriter.finishWriting { [self] in
                     if assetWriter.status == .completed {
                         logger.info("Finished recording stream '\(self.streamName)' to \(self.outputURL.lastPathComponent)")
@@ -53,9 +64,9 @@ final class StreamRecorder: @unchecked Sendable {
 
     // MARK: - Private
 
-    private func _append(_ sampleBuffer: CMSampleBuffer) {
+    private func _appendVideo(_ sampleBuffer: CMSampleBuffer) {
         if videoInput == nil {
-            setupInput(from: sampleBuffer)
+            setupVideoInput(from: sampleBuffer)
         }
 
         guard let videoInput, assetWriter.status == .writing else { return }
@@ -67,7 +78,21 @@ final class StreamRecorder: @unchecked Sendable {
         videoInput.append(sampleBuffer)
     }
 
-    private func setupInput(from sampleBuffer: CMSampleBuffer) {
+    private func _appendAudio(_ sampleBuffer: CMSampleBuffer) {
+        if audioInput == nil {
+            setupAudioInput(from: sampleBuffer)
+        }
+
+        guard let audioInput, assetWriter.status == .writing else { return }
+        guard audioInput.isReadyForMoreMediaData else { return }
+
+        let pts = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
+        guard pts >= sessionStartTime else { return }
+
+        audioInput.append(sampleBuffer)
+    }
+
+    private func setupVideoInput(from sampleBuffer: CMSampleBuffer) {
         let formatDesc = CMSampleBufferGetFormatDescription(sampleBuffer)
 
         let input: AVAssetWriterInput
@@ -97,10 +122,38 @@ final class StreamRecorder: @unchecked Sendable {
         assetWriter.add(input)
         videoInput = input
 
+        startSessionIfNeeded()
+        logger.info("Started recording stream '\(self.streamName)' (passthrough=\(self.isPassthrough))")
+    }
+
+    private func setupAudioInput(from sampleBuffer: CMSampleBuffer) {
+        let formatDesc = CMSampleBufferGetFormatDescription(sampleBuffer)
+
+        let settings: [String: Any] = [
+            AVFormatIDKey: kAudioFormatMPEG4AAC,
+            AVSampleRateKey: 44100,
+            AVNumberOfChannelsKey: 1,
+            AVEncoderBitRateKey: 128_000
+        ]
+        let input = AVAssetWriterInput(mediaType: .audio, outputSettings: settings, sourceFormatHint: formatDesc)
+        input.expectsMediaDataInRealTime = true
+
+        guard assetWriter.canAdd(input) else {
+            logger.error("Cannot add audio input to asset writer for stream '\(self.streamName)'")
+            return
+        }
+
+        assetWriter.add(input)
+        audioInput = input
+
+        startSessionIfNeeded()
+        logger.info("Audio input added for stream '\(self.streamName)'")
+    }
+
+    private func startSessionIfNeeded() {
+        guard !started else { return }
         assetWriter.startWriting()
         assetWriter.startSession(atSourceTime: sessionStartTime)
         started = true
-
-        logger.info("Started recording stream '\(self.streamName)' (passthrough=\(self.isPassthrough))")
     }
 }

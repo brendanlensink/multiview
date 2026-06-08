@@ -8,6 +8,7 @@ final class CaptureManager: NSObject {
 
     private let captureSession = AVCaptureSession()
     private let videoOutput = AVCaptureVideoDataOutput()
+    private let audioOutput = AVCaptureAudioDataOutput()
     private let outputQueue = DispatchQueue(label: "com.multiview.capture-output")
     private nonisolated let encoderBridge = EncoderBridge()
 
@@ -17,6 +18,11 @@ final class CaptureManager: NSObject {
     var onRawSampleBuffer: (@Sendable (CMSampleBuffer) -> Void)? {
         get { encoderBridge.onRawSampleBuffer }
         set { encoderBridge.onRawSampleBuffer = newValue }
+    }
+
+    var onAudioSampleBuffer: (@Sendable (CMSampleBuffer) -> Void)? {
+        get { encoderBridge.onAudioSampleBuffer }
+        set { encoderBridge.onAudioSampleBuffer = newValue }
     }
 
     var onEncodedFrame: (@Sendable (FramePacket) -> Void)? {
@@ -57,11 +63,11 @@ final class CaptureManager: NSObject {
             throw CaptureError.noCameraAvailable
         }
 
-        let input = try AVCaptureDeviceInput(device: camera)
-        guard captureSession.canAddInput(input) else {
+        let videoInput = try AVCaptureDeviceInput(device: camera)
+        guard captureSession.canAddInput(videoInput) else {
             throw CaptureError.cannotAddInput
         }
-        captureSession.addInput(input)
+        captureSession.addInput(videoInput)
 
         videoOutput.alwaysDiscardsLateVideoFrames = true
         videoOutput.videoSettings = [
@@ -77,13 +83,34 @@ final class CaptureManager: NSObject {
         if let connection = videoOutput.connection(with: .video) {
             connection.videoRotationAngle = 90
         }
+
+        guard let microphone = AVCaptureDevice.default(for: .audio) else {
+            throw CaptureError.noMicrophoneAvailable
+        }
+
+        let audioInput = try AVCaptureDeviceInput(device: microphone)
+        guard captureSession.canAddInput(audioInput) else {
+            throw CaptureError.cannotAddInput
+        }
+        captureSession.addInput(audioInput)
+
+        audioOutput.setSampleBufferDelegate(self, queue: outputQueue)
+        guard captureSession.canAddOutput(audioOutput) else {
+            throw CaptureError.cannotAddOutput
+        }
+        captureSession.addOutput(audioOutput)
     }
 }
 
 // MARK: - AVCaptureVideoDataOutputSampleBufferDelegate
 
-extension CaptureManager: AVCaptureVideoDataOutputSampleBufferDelegate {
+extension CaptureManager: AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptureAudioDataOutputSampleBufferDelegate {
     nonisolated func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
+        if output is AVCaptureAudioDataOutput {
+            encoderBridge.onAudioSampleBuffer?(sampleBuffer)
+            return
+        }
+
         encoderBridge.onRawSampleBuffer?(sampleBuffer)
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
         let presentationTime = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
@@ -100,6 +127,7 @@ extension CaptureManager: AVCaptureVideoDataOutputSampleBufferDelegate {
 private final class EncoderBridge: @unchecked Sendable {
     private var encoder: VideoEncoder?
     var onRawSampleBuffer: (@Sendable (CMSampleBuffer) -> Void)?
+    var onAudioSampleBuffer: (@Sendable (CMSampleBuffer) -> Void)?
     var onEncodedFrame: (@Sendable (FramePacket) -> Void)?
 
     func start() {
@@ -123,14 +151,16 @@ private final class EncoderBridge: @unchecked Sendable {
 
 enum CaptureError: LocalizedError {
     case noCameraAvailable
+    case noMicrophoneAvailable
     case cannotAddInput
     case cannotAddOutput
 
     var errorDescription: String? {
         switch self {
         case .noCameraAvailable: "No back camera available"
-        case .cannotAddInput: "Cannot add camera input to session"
-        case .cannotAddOutput: "Cannot add video output to session"
+        case .noMicrophoneAvailable: "No microphone available"
+        case .cannotAddInput: "Cannot add input to session"
+        case .cannotAddOutput: "Cannot add output to session"
         }
     }
 }
