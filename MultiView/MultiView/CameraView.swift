@@ -33,9 +33,14 @@ struct CameraView: View {
         VStack(spacing: 24) {
             Spacer()
 
-            if connectivity.connectionState == .connected {
+            switch connectivity.connectionState {
+            case .connected:
                 connectedView
-            } else {
+            case .connecting:
+                connectingView
+            case .disconnected:
+                disconnectedView
+            default:
                 browsingView
             }
 
@@ -89,6 +94,17 @@ struct CameraView: View {
         }
     }
 
+    private var connectingView: some View {
+        VStack(spacing: 12) {
+            ProgressView()
+                .controlSize(.large)
+
+            Text("Connecting…")
+                .font(.title2)
+                .fontWeight(.medium)
+        }
+    }
+
     private var connectedView: some View {
         VStack(spacing: 12) {
             Image(systemName: "checkmark.circle.fill")
@@ -100,6 +116,23 @@ struct CameraView: View {
                     .font(.title2)
                     .fontWeight(.medium)
             }
+        }
+    }
+
+    private var disconnectedView: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "wifi.slash")
+                .font(.system(size: 48))
+                .foregroundStyle(.red)
+
+            Text("Disconnected")
+                .font(.title2)
+                .fontWeight(.medium)
+
+            Button("Reconnect") {
+                connectivity.startBrowsing()
+            }
+            .buttonStyle(.borderedProminent)
         }
     }
 }
