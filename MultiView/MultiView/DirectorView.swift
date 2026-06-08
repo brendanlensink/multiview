@@ -80,10 +80,10 @@ struct DirectorView: View {
         .onAppear {
             captureManager.onRawSampleBuffer = { [localDisplayLayer, recordingManager] sampleBuffer in
                 localDisplayLayer.enqueue(sampleBuffer)
-                recordingManager.appendVideoSampleBuffer(sampleBuffer)
+                recordingManager.appendLocalSample(sampleBuffer)
             }
             captureManager.onAudioSampleBuffer = { [recordingManager] sampleBuffer in
-                recordingManager.appendAudioSampleBuffer(sampleBuffer)
+                recordingManager.appendLocalAudio(sampleBuffer)
             }
             captureManager.start()
 
@@ -96,6 +96,11 @@ struct DirectorView: View {
             connectivity.startAdvertising()
         }
         .onDisappear {
+            if recordingManager.isRecording {
+                videoManager.clearRecordingCallbacks()
+                Task { _ = await recordingManager.stopRecording() }
+            }
+
             captureManager.onRawSampleBuffer = nil
             captureManager.onAudioSampleBuffer = nil
             captureManager.stop()
@@ -119,31 +124,45 @@ struct DirectorView: View {
                 Spacer()
                 Button {
                     if recordingManager.isRecording {
-                        Task {
-                            let _ = await recordingManager.stopRecording()
-                        }
+                        stopRecording()
                     } else {
-                        recordingManager.startRecording()
+                        startRecording()
                     }
                 } label: {
                     Circle()
                         .fill(recordingManager.isRecording ? .red : .white)
-                        .frame(width: 64, height: 64)
+                        .frame(width: 28, height: 28)
                         .overlay {
                             if recordingManager.isRecording {
                                 RoundedRectangle(cornerRadius: 4)
                                     .fill(.white)
-                                    .frame(width: 24, height: 24)
+                                    .frame(width: 12, height: 12)
                             }
                         }
-                        .overlay {
-                            Circle()
-                                .strokeBorder(.white, lineWidth: 3)
-                        }
+                        .padding(6)
+                        .background(.black.opacity(0.5), in: Circle())
                 }
-                .padding(.bottom, 24)
-                Spacer()
+                .padding(16)
             }
+        }
+    }
+
+    private func startRecording() {
+        let peers = connectivity.connectedPeers
+        let localName = connectivity.peerID.displayName
+        recordingManager.startRecording(localPeerName: localName, remotePeers: peers)
+
+        for peer in peers {
+            videoManager.setRecordingCallback(for: peer) { [recordingManager] sampleBuffer in
+                recordingManager.appendPeerSample(sampleBuffer, from: peer)
+            }
+        }
+    }
+
+    private func stopRecording() {
+        videoManager.clearRecordingCallbacks()
+        Task {
+            _ = await recordingManager.stopRecording()
         }
     }
 

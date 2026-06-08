@@ -1,3 +1,4 @@
+import CoreMedia
 import MultipeerConnectivity
 import os
 import SwiftUI
@@ -26,6 +27,16 @@ final class PeerVideoManager {
         }
         decoders.removeAll()
         displayLayers.removeAll()
+    }
+
+    func setRecordingCallback(for peer: MCPeerID, _ callback: @escaping @Sendable (CMSampleBuffer) -> Void) {
+        decoders[peer]?.onRecordSampleBuffer = callback
+    }
+
+    func clearRecordingCallbacks() {
+        for decoder in decoders.values {
+            decoder.onRecordSampleBuffer = nil
+        }
     }
 
     // MARK: - Private

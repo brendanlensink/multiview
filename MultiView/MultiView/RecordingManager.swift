@@ -1,186 +1,132 @@
 import AVFoundation
-import Observation
+import MultipeerConnectivity
 import os
+import SwiftUI
 
 @MainActor @Observable
 final class RecordingManager {
-    private nonisolated let logger = Logger(subsystem: "com.multiview", category: "Recording")
+    private let logger = Logger(subsystem: "com.multiview", category: "Recording")
 
     private(set) var isRecording = false
-    private(set) var recordingURL: URL?
-    private(set) var error: String?
+    private let activeRecorders = ActiveRecorders()
+    private var sessionStartTime: CMTime = .zero
 
-    private nonisolated let writer = AssetWriterBridge()
+    private static let localStreamID = "director"
 
-    func startRecording() {
+    func startRecording(localPeerName: String, remotePeers: [MCPeerID]) {
         guard !isRecording else { return }
 
-        let fileName = "MultiView-\(Self.dateFormatter.string(from: Date())).mov"
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
+        let sessionDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("recordings", isDirectory: true)
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
 
         do {
-            try writer.configure(outputURL: url)
-            recordingURL = url
-            isRecording = true
-            logger.info("Recording started: \(url.lastPathComponent)")
+            try FileManager.default.createDirectory(at: sessionDir, withIntermediateDirectories: true)
         } catch {
-            self.error = error.localizedDescription
-            logger.error("Failed to start recording: \(error.localizedDescription)")
+            logger.error("Failed to create recording directory: \(error.localizedDescription)")
+            return
         }
+
+        sessionStartTime = CMClockGetTime(CMClockGetHostTimeClock())
+        logger.info("Recording session starting at \(self.sessionStartTime.seconds)s")
+
+        do {
+            let localURL = sessionDir.appendingPathComponent("\(Self.sanitize(localPeerName)).mov")
+            let localRecorder = try StreamRecorder(
+                streamName: localPeerName,
+                outputURL: localURL,
+                isPassthrough: false,
+                includeAudio: true,
+                sessionStartTime: sessionStartTime
+            )
+            activeRecorders.set(localRecorder, for: Self.localStreamID)
+        } catch {
+            logger.error("Failed to create local stream recorder: \(error.localizedDescription)")
+        }
+
+        for peer in remotePeers {
+            let streamID = peer.displayName
+            let url = sessionDir.appendingPathComponent("\(Self.sanitize(streamID)).mov")
+            do {
+                let recorder = try StreamRecorder(
+                    streamName: streamID,
+                    outputURL: url,
+                    isPassthrough: true,
+                    includeAudio: false,
+                    sessionStartTime: sessionStartTime
+                )
+                activeRecorders.set(recorder, for: streamID)
+            } catch {
+                logger.error("Failed to create recorder for peer '\(streamID)': \(error.localizedDescription)")
+            }
+        }
+
+        isRecording = true
+        logger.info("Recording started with \(self.activeRecorders.count) streams")
     }
 
-    func stopRecording() async -> URL? {
-        guard isRecording else { return nil }
+    func stopRecording() async -> [URL] {
+        guard isRecording else { return [] }
         isRecording = false
 
-        let url = await writer.finish()
-        logger.info("Recording finished: \(url?.lastPathComponent ?? "nil")")
-        return url
-    }
+        let recorders = activeRecorders.removeAll()
 
-    nonisolated func appendVideoSampleBuffer(_ sampleBuffer: CMSampleBuffer) {
-        writer.appendVideo(sampleBuffer)
-    }
-
-    nonisolated func appendAudioSampleBuffer(_ sampleBuffer: CMSampleBuffer) {
-        writer.appendAudio(sampleBuffer)
-    }
-
-    private static let dateFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "yyyy-MM-dd-HHmmss"
-        return f
-    }()
-}
-
-// MARK: - AssetWriterBridge
-
-private final class AssetWriterBridge: @unchecked Sendable {
-    private let logger = Logger(subsystem: "com.multiview", category: "AssetWriter")
-    private let queue = DispatchQueue(label: "com.multiview.asset-writer")
-
-    private var assetWriter: AVAssetWriter?
-    private var videoInput: AVAssetWriterInput?
-    private var audioInput: AVAssetWriterInput?
-    private var sessionStarted = false
-
-    func configure(outputURL: URL) throws {
-        try queue.sync {
-            if FileManager.default.fileExists(atPath: outputURL.path) {
-                try FileManager.default.removeItem(at: outputURL)
-            }
-
-            let writer = try AVAssetWriter(outputURL: outputURL, fileType: .mov)
-
-            let videoSettings: [String: Any] = [
-                AVVideoCodecKey: AVVideoCodecType.h264,
-                AVVideoWidthKey: 720,
-                AVVideoHeightKey: 1280,
-                AVVideoCompressionPropertiesKey: [
-                    AVVideoAverageBitRateKey: 2_000_000,
-                    AVVideoProfileLevelKey: AVVideoProfileLevelH264MainAutoLevel
-                ]
-            ]
-            let video = AVAssetWriterInput(mediaType: .video, outputSettings: videoSettings)
-            video.expectsMediaDataInRealTime = true
-
-            let audioSettings: [String: Any] = [
-                AVFormatIDKey: kAudioFormatMPEG4AAC,
-                AVSampleRateKey: 44100,
-                AVNumberOfChannelsKey: 1,
-                AVEncoderBitRateKey: 128_000
-            ]
-            let audio = AVAssetWriterInput(mediaType: .audio, outputSettings: audioSettings)
-            audio.expectsMediaDataInRealTime = true
-
-            guard writer.canAdd(video) else { throw RecordingError.cannotAddVideoInput }
-            writer.add(video)
-
-            guard writer.canAdd(audio) else { throw RecordingError.cannotAddAudioInput }
-            writer.add(audio)
-
-            self.assetWriter = writer
-            self.videoInput = video
-            self.audioInput = audio
-            self.sessionStarted = false
-        }
-    }
-
-    func appendVideo(_ sampleBuffer: CMSampleBuffer) {
-        queue.async { [weak self] in
-            self?.append(sampleBuffer, to: self?.videoInput, isVideo: true)
-        }
-    }
-
-    func appendAudio(_ sampleBuffer: CMSampleBuffer) {
-        queue.async { [weak self] in
-            self?.append(sampleBuffer, to: self?.audioInput, isVideo: false)
-        }
-    }
-
-    func finish() async -> URL? {
-        await withCheckedContinuation { continuation in
-            queue.async { [weak self] in
-                guard let self, let writer = self.assetWriter else {
-                    continuation.resume(returning: nil)
-                    return
-                }
-
-                let url = writer.outputURL
-                self.videoInput?.markAsFinished()
-                self.audioInput?.markAsFinished()
-
-                writer.finishWriting {
-                    if writer.status == .failed {
-                        self.logger.error("Asset writer failed: \(writer.error?.localizedDescription ?? "unknown")")
-                        continuation.resume(returning: nil)
-                    } else {
-                        continuation.resume(returning: url)
-                    }
-                    self.assetWriter = nil
-                    self.videoInput = nil
-                    self.audioInput = nil
-                    self.sessionStarted = false
-                }
+        var outputURLs: [URL] = []
+        for recorder in recorders {
+            if let url = await recorder.finish() {
+                outputURLs.append(url)
             }
         }
+
+        logger.info("Recording stopped, \(outputURLs.count) files saved")
+        return outputURLs
+    }
+
+    nonisolated func appendLocalSample(_ sampleBuffer: CMSampleBuffer) {
+        activeRecorders.recorder(for: "director")?.appendVideo(sampleBuffer)
+    }
+
+    nonisolated func appendLocalAudio(_ sampleBuffer: CMSampleBuffer) {
+        activeRecorders.recorder(for: "director")?.appendAudio(sampleBuffer)
+    }
+
+    nonisolated func appendPeerSample(_ sampleBuffer: CMSampleBuffer, from peer: MCPeerID) {
+        activeRecorders.recorder(for: peer.displayName)?.appendVideo(sampleBuffer)
     }
 
     // MARK: - Private
 
-    private func append(_ sampleBuffer: CMSampleBuffer, to input: AVAssetWriterInput?, isVideo: Bool) {
-        guard let writer = assetWriter, let input else { return }
-
-        if !sessionStarted {
-            let timestamp = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
-            writer.startWriting()
-            writer.startSession(atSourceTime: timestamp)
-            sessionStarted = true
-        }
-
-        guard writer.status == .writing else {
-            if writer.status == .failed {
-                logger.error("Asset writer error: \(writer.error?.localizedDescription ?? "unknown")")
-            }
-            return
-        }
-
-        if input.isReadyForMoreMediaData {
-            input.append(sampleBuffer)
-        }
+    private static func sanitize(_ name: String) -> String {
+        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_"))
+        return name.unicodeScalars
+            .map { allowed.contains($0) ? String($0) : "_" }
+            .joined()
     }
 }
 
-// MARK: - Errors
+// MARK: - Thread-Safe Recorder Storage
 
-enum RecordingError: LocalizedError {
-    case cannotAddVideoInput
-    case cannotAddAudioInput
+private final class ActiveRecorders: Sendable {
+    private let lock = NSLock()
+    private nonisolated(unsafe) var storage: [String: StreamRecorder] = [:]
 
-    var errorDescription: String? {
-        switch self {
-        case .cannotAddVideoInput: "Cannot add video input to asset writer"
-        case .cannotAddAudioInput: "Cannot add audio input to asset writer"
+    var count: Int {
+        lock.withLock { storage.count }
+    }
+
+    func set(_ recorder: StreamRecorder, for key: String) {
+        lock.withLock { storage[key] = recorder }
+    }
+
+    func recorder(for key: String) -> StreamRecorder? {
+        lock.withLock { storage[key] }
+    }
+
+    func removeAll() -> [StreamRecorder] {
+        lock.withLock {
+            let values = Array(storage.values)
+            storage.removeAll()
+            return values
         }
     }
 }
