@@ -1,5 +1,40 @@
 import SwiftUI
 
+// MARK: - Grid Layout
+
+private struct GridLayout {
+    let columns: Int
+    let rows: Int
+
+    static func forPeerCount(_ count: Int, in size: CGSize) -> GridLayout {
+        switch count {
+        case 0, 1:
+            return GridLayout(columns: 1, rows: 1)
+        case 2:
+            let isLandscape = size.width > size.height
+            return GridLayout(columns: isLandscape ? 2 : 1, rows: isLandscape ? 1 : 2)
+        default:
+            let rows = (count + 1) / 2
+            return GridLayout(columns: 2, rows: rows)
+        }
+    }
+
+    func cellFrame(at index: Int, in size: CGSize) -> CGRect {
+        let col = index % columns
+        let row = index / columns
+        let cellWidth = size.width / CGFloat(columns)
+        let cellHeight = size.height / CGFloat(rows)
+        return CGRect(
+            x: CGFloat(col) * cellWidth,
+            y: CGFloat(row) * cellHeight,
+            width: cellWidth,
+            height: cellHeight
+        )
+    }
+}
+
+// MARK: - Director View
+
 struct DirectorView: View {
     @Environment(ConnectivityManager.self) private var connectivity
     @Environment(\.scenePhase) private var scenePhase
@@ -39,10 +74,13 @@ struct DirectorView: View {
 
             if connectivity.connectedPeers.isEmpty {
                 waitingView
+                    .transition(.opacity)
             } else {
                 videoGrid
+                    .transition(.opacity)
             }
         }
+        .animation(.smooth(duration: 0.35), value: connectivity.connectedPeers.isEmpty)
         .onAppear {
             connectivity.onFrameReceived = { [videoManager] peer, packet in
                 Task { @MainActor in
@@ -80,25 +118,25 @@ struct DirectorView: View {
 
     private var videoGrid: some View {
         let peers = connectivity.connectedPeers
-        let columns = peers.count <= 1 ? 1 : 2
 
-        return GeometryReader { geometry in
-            let rows = (peers.count + columns - 1) / columns
-            let cellWidth = geometry.size.width / CGFloat(columns)
-            let cellHeight = geometry.size.height / CGFloat(rows)
+        GeometryReader { geometry in
+            let size = geometry.size
+            let grid = GridLayout.forPeerCount(peers.count, in: size)
 
-            LazyVGrid(
-                columns: Array(repeating: GridItem(.fixed(cellWidth), spacing: 0), count: columns),
-                spacing: 0
-            ) {
-                ForEach(peers, id: \.self) { peer in
+            ZStack {
+                ForEach(Array(peers.enumerated()), id: \.element) { index, peer in
+                    let cell = grid.cellFrame(at: index, in: size)
+
                     PeerVideoCell(
                         peerName: peer.displayName,
                         displayLayer: videoManager.displayLayers[peer]
                     )
-                    .frame(width: cellWidth, height: cellHeight)
+                    .frame(width: cell.width, height: cell.height)
+                    .position(x: cell.midX, y: cell.midY)
+                    .transition(.opacity)
                 }
             }
+            .animation(.smooth(duration: 0.35), value: peers)
         }
     }
 }
