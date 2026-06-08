@@ -77,7 +77,7 @@ struct ExportOptionsSheet: View {
         exportError = nil
         Task {
             do {
-                try await PhotosExporter.exportSeparateFiles(session: session)
+                try await PhotosExporter.exportSession(session)
                 onDismiss()
             } catch {
                 exportError = error.localizedDescription

@@ -1,57 +1,68 @@
 import Foundation
-import Photos
 import os
+import Photos
 
 struct PhotosExporter {
     private static let logger = Logger(subsystem: "com.multiview", category: "PhotosExporter")
 
     enum ExportError: LocalizedError {
         case accessDenied
-        case saveFailed(String)
+        case saveFailed(fileCount: Int)
 
         var errorDescription: String? {
             switch self {
             case .accessDenied:
                 "Photo library access was denied. Grant access in Settings to save recordings."
-            case .saveFailed(let detail):
-                "Failed to save video: \(detail)"
+            case .saveFailed(let count):
+                "Failed to save \(count) \(count == 1 ? "file" : "files") to the photo library."
             }
         }
     }
 
-    static func exportSeparateFiles(session: RecordingSession) async throws {
-        try await requestAccess()
+    static func exportSession(_ session: RecordingSession) async throws {
+        try await requestAccessIfNeeded()
 
-        var errors: [String] = []
+        let sessionDir = RecordingStore.directoryURL(for: session)
+        var failCount = 0
+
         for stream in session.streams {
-            let url = RecordingStore.fileURL(for: stream, in: session)
-            guard FileManager.default.fileExists(atPath: url.path) else {
-                errors.append("\(stream.label): file not found")
+            let fileURL = sessionDir.appendingPathComponent(stream.fileName)
+            guard FileManager.default.fileExists(atPath: fileURL.path) else {
+                logger.warning("Recording file missing for stream '\(stream.label)': \(fileURL.lastPathComponent)")
+                failCount += 1
                 continue
             }
 
             do {
                 try await PHPhotoLibrary.shared().performChanges {
-                    PHAssetCreationRequest.forAsset().addResource(with: .video, fileURL: url, options: nil)
+                    PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: fileURL)
                 }
-                logger.info("Saved \(stream.label) to Photos")
+                logger.info("Saved '\(stream.label)' to Photos")
             } catch {
-                errors.append("\(stream.label): \(error.localizedDescription)")
-                logger.error("Failed to save \(stream.label): \(error.localizedDescription)")
+                logger.error("Failed to save '\(stream.label)': \(error.localizedDescription)")
+                failCount += 1
             }
         }
 
-        if !errors.isEmpty {
-            throw ExportError.saveFailed(errors.joined(separator: "; "))
+        if failCount > 0 {
+            throw ExportError.saveFailed(fileCount: failCount)
         }
 
         RecordingStore.deleteSession(session)
-        logger.info("Export complete, cleaned up temp files for session \(session.id)")
+        logger.info("Cleaned up session \(session.id) after export")
     }
 
-    private static func requestAccess() async throws {
-        let status = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
-        guard status == .authorized || status == .limited else {
+    private static func requestAccessIfNeeded() async throws {
+        let status = PHPhotoLibrary.authorizationStatus(for: .addOnly)
+        switch status {
+        case .authorized, .limited:
+            return
+        case .notDetermined:
+            let granted = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
+            guard granted == .authorized || granted == .limited else {
+                throw ExportError.accessDenied
+            }
+        default:
             throw ExportError.accessDenied
         }
     }
