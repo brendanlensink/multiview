@@ -14,14 +14,19 @@ final class RecordingManager {
     private var sessionStartTime: CMTime = .zero
     private var backgroundTaskID: UIBackgroundTaskIdentifier = .invalid
 
+    private var currentSessionID: String?
+    private var currentSessionDir: URL?
+    private var currentStartDate: Date?
+    private var currentStreamInfos: [RecordingSession.StreamInfo] = []
+
     private static let localStreamID = "director"
 
     func startRecording(localPeerName: String, remotePeers: [MCPeerID]) {
         guard !isRecording else { return }
 
-        let sessionDir = FileManager.default.temporaryDirectory
-            .appendingPathComponent("recordings", isDirectory: true)
-            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let sessionID = UUID().uuidString
+        let sessionDir = RecordingStore.recordingsDirectory
+            .appendingPathComponent(sessionID, isDirectory: true)
 
         do {
             try FileManager.default.createDirectory(at: sessionDir, withIntermediateDirectories: true)
@@ -30,12 +35,23 @@ final class RecordingManager {
             return
         }
 
+        FileManager.default.createFile(
+            atPath: sessionDir.appendingPathComponent(RecordingSession.inProgressFileName).path,
+            contents: nil
+        )
+
+        currentSessionID = sessionID
+        currentSessionDir = sessionDir
+        currentStartDate = Date()
+        currentStreamInfos = []
+
         sessionStartTime = CMClockGetTime(CMClockGetHostTimeClock())
         lostStreamCount = 0
-        logger.info("Recording session starting at \(self.sessionStartTime.seconds)s")
+        logger.info("Recording session \(sessionID) starting at \(self.sessionStartTime.seconds)s")
 
+        let localFileName = "\(Self.sanitize(localPeerName)).mov"
         do {
-            let localURL = sessionDir.appendingPathComponent("\(Self.sanitize(localPeerName)).mov")
+            let localURL = sessionDir.appendingPathComponent(localFileName)
             let localRecorder = try StreamRecorder(
                 streamName: localPeerName,
                 outputURL: localURL,
@@ -44,13 +60,17 @@ final class RecordingManager {
                 sessionStartTime: sessionStartTime
             )
             activeRecorders.set(localRecorder, for: Self.localStreamID)
+            currentStreamInfos.append(RecordingSession.StreamInfo(
+                label: localPeerName, fileName: localFileName, isLocal: true, hasAudio: true
+            ))
         } catch {
             logger.error("Failed to create local stream recorder: \(error.localizedDescription)")
         }
 
         for peer in remotePeers {
             let streamID = peer.displayName
-            let url = sessionDir.appendingPathComponent("\(Self.sanitize(streamID)).mov")
+            let fileName = "\(Self.sanitize(streamID)).mov"
+            let url = sessionDir.appendingPathComponent(fileName)
             do {
                 let recorder = try StreamRecorder(
                     streamName: streamID,
@@ -60,6 +80,9 @@ final class RecordingManager {
                     sessionStartTime: sessionStartTime
                 )
                 activeRecorders.set(recorder, for: streamID)
+                currentStreamInfos.append(RecordingSession.StreamInfo(
+                    label: streamID, fileName: fileName, isLocal: false, hasAudio: false
+                ))
             } catch {
                 logger.error("Failed to create recorder for peer '\(streamID)': \(error.localizedDescription)")
             }
@@ -69,22 +92,23 @@ final class RecordingManager {
         logger.info("Recording started with \(self.activeRecorders.count) streams")
     }
 
-    func stopRecording() async -> [URL] {
-        guard isRecording else { return [] }
+    func stopRecording() async -> RecordingSession? {
+        guard isRecording else { return nil }
         isRecording = false
         lostStreamCount = 0
 
         let recorders = activeRecorders.removeAll()
 
-        var outputURLs: [URL] = []
+        var successCount = 0
         for recorder in recorders {
-            if let url = await recorder.finish() {
-                outputURLs.append(url)
+            if await recorder.finish() != nil {
+                successCount += 1
             }
         }
 
-        logger.info("Recording stopped, \(outputURLs.count) files saved")
-        return outputURLs
+        let session = writeSessionMetadata()
+        logger.info("Recording stopped, \(successCount) files saved")
+        return session
     }
 
     func finalizePeerStream(_ peer: MCPeerID) {
@@ -128,6 +152,8 @@ final class RecordingManager {
         let recorders = activeRecorders.removeAll()
         logger.info("Finalizing \(recorders.count) streams for app backgrounding")
 
+        writeSessionMetadata()
+
         Task.detached { [weak self] in
             for recorder in recorders {
                 _ = await recorder.finish()
@@ -152,6 +178,44 @@ final class RecordingManager {
     }
 
     // MARK: - Private
+
+    @discardableResult
+    private func writeSessionMetadata() -> RecordingSession? {
+        guard let sessionID = currentSessionID,
+              let sessionDir = currentSessionDir,
+              let startDate = currentStartDate else { return nil }
+
+        let endDate = Date()
+        let session = RecordingSession(
+            id: sessionID,
+            startDate: startDate,
+            endDate: endDate,
+            duration: endDate.timeIntervalSince(startDate),
+            streams: currentStreamInfos
+        )
+
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+
+        do {
+            let data = try encoder.encode(session)
+            try data.write(to: sessionDir.appendingPathComponent(RecordingSession.metadataFileName))
+            try? FileManager.default.removeItem(
+                at: sessionDir.appendingPathComponent(RecordingSession.inProgressFileName)
+            )
+            logger.info("Wrote session metadata for \(sessionID)")
+        } catch {
+            logger.error("Failed to write session metadata: \(error.localizedDescription)")
+        }
+
+        currentSessionID = nil
+        currentSessionDir = nil
+        currentStartDate = nil
+        currentStreamInfos = []
+
+        return session
+    }
 
     private func endBackgroundTask() {
         guard backgroundTaskID != .invalid else { return }
