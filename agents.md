@@ -32,6 +32,7 @@ All source lives under `MultiView/MultiView/`:
 | `StreamRecorder.swift` | Wraps `AVAssetWriter` for a single video/audio stream, writes `.mov` files |
 | `RecordingSession.swift` | Codable metadata model for a completed recording (streams, timestamps, duration) |
 | `RecordingStore.swift` | Manages recording temp directory — lists completed sessions, cleans up orphaned recordings |
+| `PhotosExporter.swift` | Exports recording sessions to the Photos library via `PHPhotoLibrary`, cleans up temp files on success |
 
 ## Video Pipeline
 
@@ -78,8 +79,9 @@ tmp/recordings/<session-uuid>/
 1. Start → create session dir, write `.recording` marker, start `StreamRecorder`s
 2. Stop → finalize all writers, write `session.json`, remove `.recording` marker
 3. App launch → `RecordingStore.cleanupIncompleteRecordings()` deletes dirs with a `.recording` marker or missing `session.json`
+4. Export → `PhotosExporter.exportSession()` saves each `.mov` to Photos via `PHPhotoLibrary`, then `RecordingStore.deleteSession()` removes the temp dir
 
-**Export integration:** `RecordingStore.completedSessions()` returns `[RecordingSession]` sorted newest-first. Each session has stream metadata and file references. Use `RecordingStore.fileURL(for:in:)` to resolve `.mov` paths.
+**Export integration:** `RecordingStore.completedSessions()` returns `[RecordingSession]` sorted newest-first. Each session has stream metadata and file references. Use `RecordingStore.fileURL(for:in:)` to resolve `.mov` paths. Currently, export to Photos triggers automatically after recording stops in `DirectorView`.
 
 ## Key Integration Points
 
@@ -87,4 +89,4 @@ tmp/recordings/<session-uuid>/
 - `CaptureManager.onRawSampleBuffer` — raw camera output on the director's own device.
 - `ConnectivityManager` peer connect/disconnect callbacks — use for reacting to topology changes.
 - `TimeSyncManager` — provides clock offset per peer so presentation timestamps can be aligned across streams.
-- `Info.plist` already declares Camera, Microphone, Local Network, and Bonjour permissions.
+- `Info.plist` declares Camera, Microphone, Local Network, Bonjour, and Photo Library Add permissions.
