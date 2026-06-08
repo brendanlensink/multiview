@@ -77,13 +77,12 @@ struct DirectorView: View {
         }
         .onAppear {
             captureManager.onRawSampleBuffer = { [localDisplayLayer] sampleBuffer in
-                DispatchQueue.main.async {
-                    localDisplayLayer.enqueue(sampleBuffer)
-                }
+                localDisplayLayer.enqueue(sampleBuffer)
             }
             captureManager.start()
 
             connectivity.onFrameReceived = { [videoManager] peer, packet in
+                nonisolated(unsafe) let peer = peer
                 Task { @MainActor in
                     videoManager.handleFrame(from: peer, packet: packet)
                 }
@@ -110,7 +109,7 @@ struct DirectorView: View {
         let peers = connectivity.connectedPeers
         let totalCells = peers.count + 1
 
-        GeometryReader { geometry in
+        return GeometryReader { geometry in
             let size = geometry.size
             let grid = GridLayout.forPeerCount(totalCells, in: size)
             let directorCell = grid.cellFrame(at: 0, in: size)

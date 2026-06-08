@@ -38,9 +38,7 @@ final class PeerVideoManager {
         let layer = SampleBufferDisplayLayer()
         let decoder = VideoDecoder()
         decoder.onSampleBuffer = { [weak layer] sampleBuffer in
-            DispatchQueue.main.async {
-                layer?.enqueue(sampleBuffer)
-            }
+            layer?.enqueue(sampleBuffer)
         }
 
         decoders[peer] = decoder

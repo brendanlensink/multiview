@@ -40,7 +40,7 @@ final class ConnectivityManager: NSObject {
 
     nonisolated(unsafe) private(set) var timeSync: TimeSyncManager!
 
-    var onFrameReceived: (@Sendable (MCPeerID, FramePacket) -> Void)?
+    nonisolated(unsafe) var onFrameReceived: (@Sendable (MCPeerID, FramePacket) -> Void)?
 
     override init() {
         super.init()
