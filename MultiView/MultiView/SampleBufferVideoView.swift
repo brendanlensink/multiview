@@ -9,7 +9,7 @@ final class SampleBufferDisplayLayer: @unchecked Sendable {
     private var needsFlush = false
 
     init() {
-        displayLayer.videoGravity = .resizeAspectFill
+        displayLayer.videoGravity = .resizeAspect
         displayLayer.preventsDisplaySleepDuringVideoPlayback = true
     }
 

@@ -5,13 +5,18 @@ final class VideoEncoder: @unchecked Sendable {
     private let logger = Logger(subsystem: "com.multiview", category: "VideoEncoder")
 
     private var compressionSession: VTCompressionSession?
+    private var sessionWidth: Int32 = 0
+    private var sessionHeight: Int32 = 0
     var onEncodedFrame: (@Sendable (FramePacket) -> Void)?
 
-    init() {
-        setupSession()
-    }
-
     func encode(pixelBuffer: CVPixelBuffer, presentationTime: CMTime) {
+        let width = Int32(CVPixelBufferGetWidth(pixelBuffer))
+        let height = Int32(CVPixelBufferGetHeight(pixelBuffer))
+
+        if compressionSession == nil || width != sessionWidth || height != sessionHeight {
+            setupSession(width: width, height: height)
+        }
+
         guard let session = compressionSession else { return }
 
         let status = VTCompressionSessionEncodeFrame(
@@ -49,9 +54,12 @@ final class VideoEncoder: @unchecked Sendable {
 
     // MARK: - Private
 
-    private func setupSession() {
-        let width: Int32 = 1280
-        let height: Int32 = 720
+    private func setupSession(width: Int32, height: Int32) {
+        if let session = compressionSession {
+            VTCompressionSessionCompleteFrames(session, untilPresentationTimeStamp: .invalid)
+            VTCompressionSessionInvalidate(session)
+            compressionSession = nil
+        }
 
         let status = VTCompressionSessionCreate(
             allocator: nil,
@@ -70,6 +78,9 @@ final class VideoEncoder: @unchecked Sendable {
             logger.error("Failed to create compression session: \(status)")
             return
         }
+
+        sessionWidth = width
+        sessionHeight = height
 
         VTSessionSetProperty(session, key: kVTCompressionPropertyKey_RealTime, value: kCFBooleanTrue)
         VTSessionSetProperty(session, key: kVTCompressionPropertyKey_ProfileLevel, value: kVTProfileLevel_H264_Main_AutoLevel)

@@ -19,31 +19,16 @@ private struct GridLayout {
         }
     }
 
-    private static let cellAspectRatio: CGFloat = 4.0 / 3.0
-
     func cellFrame(at index: Int, in size: CGSize) -> CGRect {
         let col = index % columns
         let row = index / columns
-        let slotWidth = size.width / CGFloat(columns)
-        let slotHeight = size.height / CGFloat(rows)
-
-        let fitWidth: CGFloat
-        let fitHeight: CGFloat
-        if slotWidth / slotHeight > Self.cellAspectRatio {
-            fitHeight = slotHeight
-            fitWidth = slotHeight * Self.cellAspectRatio
-        } else {
-            fitWidth = slotWidth
-            fitHeight = slotWidth / Self.cellAspectRatio
-        }
-
-        let slotX = CGFloat(col) * slotWidth
-        let slotY = CGFloat(row) * slotHeight
+        let cellWidth = size.width / CGFloat(columns)
+        let cellHeight = size.height / CGFloat(rows)
         return CGRect(
-            x: slotX + (slotWidth - fitWidth) / 2,
-            y: slotY + (slotHeight - fitHeight) / 2,
-            width: fitWidth,
-            height: fitHeight
+            x: CGFloat(col) * cellWidth,
+            y: CGFloat(row) * cellHeight,
+            width: cellWidth,
+            height: cellHeight
         )
     }
 }
@@ -181,10 +166,10 @@ private struct PeerVideoCell: View {
                 .foregroundStyle(.white)
                 .padding(8)
         }
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .clipped()
         .overlay {
             if isLocal {
-                RoundedRectangle(cornerRadius: 8)
+                RoundedRectangle(cornerRadius: 4)
                     .strokeBorder(.blue, lineWidth: 2)
             }
         }
