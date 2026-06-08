@@ -46,6 +46,7 @@ struct DirectorView: View {
     @State private var localDisplayLayer = SampleBufferDisplayLayer()
     @State private var isTransitioning = false
     @State private var recordingStartDate: Date?
+    @State private var completedSession: RecordingSession?
 
     var body: some View {
         Group {
@@ -61,6 +62,11 @@ struct DirectorView: View {
             }
         }
         .navigationTitle("Director")
+        .sheet(item: $completedSession) { session in
+            ExportOptionsSheet(session: session) {
+                completedSession = nil
+            }
+        }
         .task {
             await permissionManager.requestAllMediaPermissions()
         }
@@ -201,9 +207,10 @@ struct DirectorView: View {
         isTransitioning = true
         videoManager.clearRecordingCallbacks()
         Task {
-            _ = await recordingManager.stopRecording()
+            let session = await recordingManager.stopRecording()
             recordingStartDate = nil
             isTransitioning = false
+            completedSession = session
         }
     }
 
