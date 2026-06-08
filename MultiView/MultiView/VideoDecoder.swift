@@ -6,6 +6,7 @@ final class VideoDecoder: @unchecked Sendable {
 
     private var formatDescription: CMFormatDescription?
     var onSampleBuffer: (@Sendable (CMSampleBuffer) -> Void)?
+    var onRecordSampleBuffer: (@Sendable (CMSampleBuffer) -> Void)?
 
     func decode(packet: FramePacket) {
         if packet.isKeyFrame, let paramData = packet.parameterSets {
@@ -44,6 +45,7 @@ final class VideoDecoder: @unchecked Sendable {
         }
 
         onSampleBuffer?(sampleBuffer)
+        onRecordSampleBuffer?(sampleBuffer)
     }
 
     func invalidate() {

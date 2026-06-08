@@ -1,0 +1,106 @@
+import AVFoundation
+import os
+
+final class StreamRecorder: @unchecked Sendable {
+    private let logger = Logger(subsystem: "com.multiview", category: "StreamRecorder")
+
+    private let assetWriter: AVAssetWriter
+    private var videoInput: AVAssetWriterInput?
+    private let outputURL: URL
+    private let queue = DispatchQueue(label: "com.multiview.stream-recorder")
+    private let isPassthrough: Bool
+    private var started = false
+    private var sessionStartTime: CMTime
+
+    let streamName: String
+
+    init(streamName: String, outputURL: URL, isPassthrough: Bool, sessionStartTime: CMTime) throws {
+        self.streamName = streamName
+        self.outputURL = outputURL
+        self.isPassthrough = isPassthrough
+        self.sessionStartTime = sessionStartTime
+        self.assetWriter = try AVAssetWriter(url: outputURL, fileType: .mov)
+    }
+
+    func append(_ sampleBuffer: CMSampleBuffer) {
+        queue.async { [self] in
+            _append(sampleBuffer)
+        }
+    }
+
+    func finish() async -> URL? {
+        await withCheckedContinuation { continuation in
+            queue.async { [self] in
+                guard started else {
+                    logger.info("Stream '\(self.streamName)' had no samples, skipping finalization")
+                    continuation.resume(returning: nil)
+                    return
+                }
+
+                videoInput?.markAsFinished()
+                assetWriter.finishWriting { [self] in
+                    if assetWriter.status == .completed {
+                        logger.info("Finished recording stream '\(self.streamName)' to \(self.outputURL.lastPathComponent)")
+                        continuation.resume(returning: outputURL)
+                    } else {
+                        logger.error("Failed to finish stream '\(self.streamName)': \(self.assetWriter.error?.localizedDescription ?? "unknown")")
+                        continuation.resume(returning: nil)
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Private
+
+    private func _append(_ sampleBuffer: CMSampleBuffer) {
+        if videoInput == nil {
+            setupInput(from: sampleBuffer)
+        }
+
+        guard let videoInput, assetWriter.status == .writing else { return }
+        guard videoInput.isReadyForMoreMediaData else { return }
+
+        let pts = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
+        guard pts >= sessionStartTime else { return }
+
+        videoInput.append(sampleBuffer)
+    }
+
+    private func setupInput(from sampleBuffer: CMSampleBuffer) {
+        let formatDesc = CMSampleBufferGetFormatDescription(sampleBuffer)
+
+        let input: AVAssetWriterInput
+        if isPassthrough {
+            input = AVAssetWriterInput(mediaType: .video, outputSettings: nil, sourceFormatHint: formatDesc)
+        } else {
+            let dimensions = formatDesc.flatMap { CMVideoFormatDescriptionGetDimensions($0) }
+                ?? CMVideoDimensions(width: 1280, height: 720)
+            let settings: [String: Any] = [
+                AVVideoCodecKey: AVVideoCodecType.h264,
+                AVVideoWidthKey: Int(dimensions.width),
+                AVVideoHeightKey: Int(dimensions.height),
+                AVVideoCompressionPropertiesKey: [
+                    AVVideoAverageBitRateKey: 2_000_000
+                ]
+            ]
+            input = AVAssetWriterInput(mediaType: .video, outputSettings: settings, sourceFormatHint: formatDesc)
+        }
+
+        input.expectsMediaDataInRealTime = true
+
+        guard assetWriter.canAdd(input) else {
+            logger.error("Cannot add video input to asset writer for stream '\(self.streamName)'")
+            return
+        }
+
+        assetWriter.add(input)
+        videoInput = input
+
+        assetWriter.startWriting()
+        assetWriter.startSession(atSourceTime: sessionStartTime)
+        started = true
+
+        logger.info("Started recording stream '\(self.streamName)' (passthrough=\(self.isPassthrough))")
+    }
+}
