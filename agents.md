@@ -28,6 +28,10 @@ All source lives under `MultiView/MultiView/`:
 | `PeerVideoManager.swift` | Owns one `VideoDecoder` per connected peer, manages decoded output |
 | `TimeSyncManager.swift` | NTP-like ping/pong time sync across peers (30s refresh, 5-sample average) |
 | `PermissionManager.swift` | Camera/mic permission requests |
+| `RecordingManager.swift` | Orchestrates multi-stream recording — creates `StreamRecorder` per stream, writes session metadata |
+| `StreamRecorder.swift` | Wraps `AVAssetWriter` for a single video/audio stream, writes `.mov` files |
+| `RecordingSession.swift` | Codable metadata model for a completed recording (streams, timestamps, duration) |
+| `RecordingStore.swift` | Manages recording temp directory — lists completed sessions, cleans up orphaned recordings |
 
 ## Video Pipeline
 
@@ -56,6 +60,26 @@ MCSession.didReceive()
 
 - **Director**: advertises via `MCNearbyServiceAdvertiser`, accepts connections, runs local capture, displays all feeds in a grid (own camera at position 0, peers at 1..N). Sets `isDirector = true`.
 - **Camera**: browses via `MCNearbyServiceBrowser`, invites director, streams encoded video, shows local preview only.
+
+## Recording & File Management
+
+Recording is director-only. `RecordingManager` creates one `StreamRecorder` (AVAssetWriter) per stream — the director's local camera + one per connected peer.
+
+**File structure:**
+```
+tmp/recordings/<session-uuid>/
+  .recording              ← in-progress marker, removed on completion
+  session.json            ← RecordingSession metadata (written on stop)
+  <director-name>.mov     ← local camera + audio
+  <peer-name>.mov         ← one per connected peer (video only)
+```
+
+**Lifecycle:**
+1. Start → create session dir, write `.recording` marker, start `StreamRecorder`s
+2. Stop → finalize all writers, write `session.json`, remove `.recording` marker
+3. App launch → `RecordingStore.cleanupIncompleteRecordings()` deletes dirs with a `.recording` marker or missing `session.json`
+
+**Export integration:** `RecordingStore.completedSessions()` returns `[RecordingSession]` sorted newest-first. Each session has stream metadata and file references. Use `RecordingStore.fileURL(for:in:)` to resolve `.mov` paths.
 
 ## Key Integration Points
 
