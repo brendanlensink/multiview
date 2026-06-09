@@ -24,6 +24,7 @@ final class FeedLayoutManager {
 
     private(set) var frames: [FeedID: Frame] = [:]
     private(set) var activeFeedID: FeedID?
+    var editingFeedID: FeedID?
     private(set) var containerSize: CGSize = .zero
 
     private let minimumSide: CGFloat = 120
@@ -35,6 +36,7 @@ final class FeedLayoutManager {
             return
         }
 
+        editingFeedID = nil
         let count = feeds.count
         let columns: Int
         let rows: Int

@@ -233,6 +233,14 @@ struct DirectorView: View {
 
         return GeometryReader { geometry in
             ZStack {
+                Color.clear
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            layoutManager.editingFeedID = nil
+                        }
+                    }
+
                 InteractiveFeedCell(
                     feedID: .director,
                     layoutManager: layoutManager,
@@ -282,6 +290,7 @@ private struct InteractiveFeedCell: View {
 
     var body: some View {
         if let frame = layoutManager.frames[feedID] {
+            let isEditing = layoutManager.editingFeedID == feedID
             let isActive = layoutManager.activeFeedID == feedID
             PeerVideoCell(
                 peerName: peerName,
@@ -290,12 +299,23 @@ private struct InteractiveFeedCell: View {
                 isDisconnected: isDisconnected
             )
             .frame(width: frame.size.width, height: frame.size.height)
+            .overlay {
+                if isEditing {
+                    RoundedRectangle(cornerRadius: 4)
+                        .strokeBorder(.red, lineWidth: 3)
+                }
+            }
             .position(frame.center)
-            .zIndex(isActive ? 1 : 0)
-            .shadow(color: isActive ? .white.opacity(0.3) : .clear, radius: isActive ? 8 : 0)
+            .zIndex(isEditing ? 1 : 0)
             .animation(isActive ? nil : .easeOut(duration: 0.15), value: frame)
+            .onTapGesture {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    layoutManager.editingFeedID = isEditing ? nil : feedID
+                }
+            }
             .gesture(
-                DragGesture(minimumDistance: 5)
+                isEditing
+                ? DragGesture(minimumDistance: 5)
                     .onChanged { value in
                         if dragAnchor == nil {
                             dragAnchor = layoutManager.frames[feedID]?.center
@@ -310,9 +330,11 @@ private struct InteractiveFeedCell: View {
                         dragAnchor = nil
                         layoutManager.endGesture()
                     }
+                : nil
             )
             .simultaneousGesture(
-                MagnifyGesture()
+                isEditing
+                ? MagnifyGesture()
                     .onChanged { value in
                         if pinchAnchor == nil {
                             pinchAnchor = layoutManager.frames[feedID]?.size
@@ -327,6 +349,7 @@ private struct InteractiveFeedCell: View {
                         pinchAnchor = nil
                         layoutManager.endGesture()
                     }
+                : nil
             )
         }
     }
