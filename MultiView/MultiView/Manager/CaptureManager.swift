@@ -31,6 +31,33 @@ final class CaptureManager: NSObject {
 
     var previewSource: AVCaptureSession { captureSession }
 
+    func applyQualityTier(_ tier: CaptureQualityTier) {
+        guard isRunning else { return }
+
+        let preset: AVCaptureSession.Preset
+        let bitrate: Int
+        switch tier {
+        case .full:
+            preset = .hd1280x720
+            bitrate = 2_000_000
+        case .reduced:
+            preset = .hd1280x720
+            bitrate = 1_000_000
+        case .minimal:
+            preset = .vga640x480
+            bitrate = 500_000
+        }
+
+        if captureSession.sessionPreset != preset && captureSession.canSetSessionPreset(preset) {
+            captureSession.beginConfiguration()
+            captureSession.sessionPreset = preset
+            captureSession.commitConfiguration()
+            logger.info("Session preset changed to \(preset.rawValue) for tier \(tier.rawValue)")
+        }
+
+        encoderBridge.updateBitrate(bitrate)
+    }
+
     func start() {
         guard !isRunning else { return }
 
@@ -144,6 +171,10 @@ private final class EncoderBridge: @unchecked Sendable {
 
     func encode(pixelBuffer: CVPixelBuffer, presentationTime: CMTime) {
         encoder?.encode(pixelBuffer: pixelBuffer, presentationTime: presentationTime)
+    }
+
+    func updateBitrate(_ bitrate: Int) {
+        encoder?.updateBitrate(bitrate)
     }
 }
 

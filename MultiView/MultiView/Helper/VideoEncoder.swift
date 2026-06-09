@@ -40,6 +40,12 @@ final class VideoEncoder: @unchecked Sendable {
         }
     }
 
+    func updateBitrate(_ bitrate: Int) {
+        guard let session = compressionSession else { return }
+        VTSessionSetProperty(session, key: kVTCompressionPropertyKey_AverageBitRate, value: bitrate as CFNumber)
+        logger.info("Bitrate updated to \(bitrate)")
+    }
+
     func invalidate() {
         if let session = compressionSession {
             VTCompressionSessionCompleteFrames(session, untilPresentationTimeStamp: .invalid)

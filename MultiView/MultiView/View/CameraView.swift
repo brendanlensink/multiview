@@ -4,6 +4,7 @@ struct CameraView: View {
     @Environment(ConnectivityManager.self) private var connectivity
     @Environment(\.scenePhase) private var scenePhase
     @State private var captureManager = CaptureManager()
+    @State private var conditionManager = DeviceConditionManager()
 
     var body: some View {
         cameraContent
@@ -23,6 +24,9 @@ struct CameraView: View {
                 .ignoresSafeArea()
 
             VStack {
+                ThrottleIndicator(tier: conditionManager.qualityTier)
+                    .padding(.top, 8)
+                    .animation(.easeInOut, value: conditionManager.qualityTier)
                 Spacer()
                 connectionOverlay
                     .padding()
@@ -36,12 +40,17 @@ struct CameraView: View {
                 sender.enqueue(packet)
             }
             captureManager.start()
+            conditionManager.startMonitoring()
             connectivity.startBrowsing()
         }
         .onDisappear {
             captureManager.onEncodedFrame = nil
             captureManager.stop()
+            conditionManager.stopMonitoring()
             connectivity.stopBrowsing()
+        }
+        .onChange(of: conditionManager.qualityTier) {
+            captureManager.applyQualityTier(conditionManager.qualityTier)
         }
         .onChange(of: connectivity.connectionState) {
             if connectivity.connectionState == .connected {

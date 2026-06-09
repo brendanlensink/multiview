@@ -42,6 +42,7 @@ struct DirectorView: View {
     @State private var videoManager = PeerVideoManager()
     @State private var captureManager = CaptureManager()
     @State private var recordingManager = RecordingManager()
+    @State private var conditionManager = DeviceConditionManager()
     @State private var localDisplayLayer = SampleBufferDisplayLayer()
     @State private var isTransitioning = false
     @State private var recordingStartDate: Date?
@@ -84,6 +85,7 @@ struct DirectorView: View {
                 recordingManager.appendLocalAudio(sampleBuffer)
             }
             captureManager.start()
+            conditionManager.startMonitoring()
 
             connectivity.onFrameReceived = { [videoManager] peer, packet in
                 nonisolated(unsafe) let peer = peer
@@ -102,6 +104,7 @@ struct DirectorView: View {
             captureManager.onRawSampleBuffer = nil
             captureManager.onAudioSampleBuffer = nil
             captureManager.stop()
+            conditionManager.stopMonitoring()
 
             connectivity.onFrameReceived = nil
             connectivity.stopAdvertising()
@@ -125,13 +128,20 @@ struct DirectorView: View {
                 recordingManager.finalizeLocalStream()
             }
         }
+        .onChange(of: conditionManager.qualityTier) {
+            captureManager.applyQualityTier(conditionManager.qualityTier)
+        }
     }
 
     private var recordingOverlay: some View {
         VStack {
-            if recordingManager.isRecording, let startDate = recordingStartDate {
-                RecordingIndicator(startDate: startDate, lostStreamCount: recordingManager.lostStreamCount)
-                    .transition(.move(edge: .top).combined(with: .opacity))
+            VStack(spacing: 4) {
+                if recordingManager.isRecording, let startDate = recordingStartDate {
+                    RecordingIndicator(startDate: startDate, lostStreamCount: recordingManager.lostStreamCount)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                }
+                ThrottleIndicator(tier: conditionManager.qualityTier)
+                    .animation(.easeInOut, value: conditionManager.qualityTier)
             }
             Spacer()
             HStack {
