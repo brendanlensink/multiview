@@ -39,7 +39,6 @@ private struct GridLayout {
 struct DirectorView: View {
     @Environment(ConnectivityManager.self) private var connectivity
     @Environment(\.scenePhase) private var scenePhase
-    @State private var permissionManager = PermissionManager()
     @State private var videoManager = PeerVideoManager()
     @State private var captureManager = CaptureManager()
     @State private var recordingManager = RecordingManager()
@@ -49,30 +48,15 @@ struct DirectorView: View {
     @State private var completedSession: RecordingSession?
 
     var body: some View {
-        Group {
-            if permissionManager.allMediaPermissionsGranted {
-                directorContent
-            } else if permissionManager.hasAnyDenied {
-                PermissionDeniedView(
-                    cameraStatus: permissionManager.cameraStatus,
-                    microphoneStatus: permissionManager.microphoneStatus
-                )
-            } else {
-                ProgressView("Requesting permissions...")
-            }
-        }
+        directorContent
         .navigationTitle("Director")
         .sheet(item: $completedSession) { session in
             ExportOptionsSheet(session: session) {
                 completedSession = nil
             }
         }
-        .task {
-            await permissionManager.requestAllMediaPermissions()
-        }
         .onChange(of: scenePhase) {
             if scenePhase == .active {
-                permissionManager.refreshStatuses()
                 connectivity.handleAppForegrounded()
             } else if scenePhase == .background {
                 if recordingManager.isRecording {

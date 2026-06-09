@@ -3,29 +3,13 @@ import SwiftUI
 struct CameraView: View {
     @Environment(ConnectivityManager.self) private var connectivity
     @Environment(\.scenePhase) private var scenePhase
-    @State private var permissionManager = PermissionManager()
     @State private var captureManager = CaptureManager()
 
     var body: some View {
-        Group {
-            if permissionManager.allMediaPermissionsGranted {
-                cameraContent
-            } else if permissionManager.hasAnyDenied {
-                PermissionDeniedView(
-                    cameraStatus: permissionManager.cameraStatus,
-                    microphoneStatus: permissionManager.microphoneStatus
-                )
-            } else {
-                ProgressView("Requesting permissions...")
-            }
-        }
+        cameraContent
         .navigationTitle("Camera")
-        .task {
-            await permissionManager.requestAllMediaPermissions()
-        }
         .onChange(of: scenePhase) {
             if scenePhase == .active {
-                permissionManager.refreshStatuses()
                 connectivity.handleAppForegrounded()
             } else if scenePhase == .background {
                 connectivity.handleAppBackgrounded()

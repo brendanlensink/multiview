@@ -6,6 +6,11 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		B32D541F2FD7497700103EEC /* NiceComponents in Frameworks */ = {isa = PBXBuildFile; productRef = B32D541E2FD7497700103EEC /* NiceComponents */; };
+		B32D54212FD7497700103EEC /* NiceInit in Frameworks */ = {isa = PBXBuildFile; productRef = B32D54202FD7497700103EEC /* NiceInit */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		A1000001 /* MultiView.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MultiView.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -23,6 +28,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B32D541F2FD7497700103EEC /* NiceComponents in Frameworks */,
+				B32D54212FD7497700103EEC /* NiceInit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -65,6 +72,8 @@
 			);
 			name = MultiView;
 			packageProductDependencies = (
+				B32D541E2FD7497700103EEC /* NiceComponents */,
+				B32D54202FD7497700103EEC /* NiceInit */,
 			);
 			productName = MultiView;
 			productReference = A1000001 /* MultiView.app */;
@@ -94,6 +103,9 @@
 			);
 			mainGroup = A1000004;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				B32D541D2FD7497700103EEC /* XCRemoteSwiftPackageReference "niceComponents" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = A1000005 /* Products */;
 			projectDirPath = "";
@@ -328,6 +340,30 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		B32D541D2FD7497700103EEC /* XCRemoteSwiftPackageReference "niceComponents" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/steamclock/niceComponents.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.2.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		B32D541E2FD7497700103EEC /* NiceComponents */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B32D541D2FD7497700103EEC /* XCRemoteSwiftPackageReference "niceComponents" */;
+			productName = NiceComponents;
+		};
+		B32D54202FD7497700103EEC /* NiceInit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B32D541D2FD7497700103EEC /* XCRemoteSwiftPackageReference "niceComponents" */;
+			productName = NiceInit;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = A1000008 /* Project object */;
 }

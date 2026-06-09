@@ -14,9 +14,14 @@ struct PermissionDeniedView: View {
                 .font(.system(size: 48))
                 .foregroundStyle(.orange)
 
-            Text("Permissions Required")
+            Text("MultiView Can't Run")
                 .font(.title2)
                 .fontWeight(.semibold)
+
+            Text("Required permissions are turned off. Enable them in Settings to use the app.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
 
             VStack(alignment: .leading, spacing: 12) {
                 if cameraStatus == .denied || cameraStatus == .restricted {
@@ -34,10 +39,6 @@ struct PermissionDeniedView: View {
                     )
                 }
             }
-
-            Text("Open Settings to grant access.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
 
             Button("Open Settings") {
                 if let url = URL(string: UIApplication.openSettingsURLString) {

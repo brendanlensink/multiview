@@ -80,6 +80,15 @@ final class ConnectivityManager: NSObject {
         }
     }
 
+    /// Briefly advertises to trigger the local network permission prompt during onboarding.
+    func probeLocalNetworkAccess() {
+        startAdvertising()
+        Task {
+            try? await Task.sleep(for: .seconds(1))
+            stopAdvertising()
+        }
+    }
+
     // MARK: - Browsing (Camera)
 
     func startBrowsing() {

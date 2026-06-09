@@ -1,11 +1,5 @@
 import Foundation
 
-enum WireMessageType: UInt8 {
-    case frame = 0x01
-    case syncPing = 0x02
-    case syncPong = 0x03
-}
-
 struct FramePacket {
     let isKeyFrame: Bool
     var presentationTime: UInt64
