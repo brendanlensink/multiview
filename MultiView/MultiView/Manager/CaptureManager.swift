@@ -1,5 +1,6 @@
 import AVFoundation
 import Observation
+import UIKit
 import os
 
 @MainActor @Observable
@@ -66,6 +67,14 @@ final class CaptureManager: NSObject {
             encoderBridge.start()
             captureSession.startRunning()
             isRunning = true
+            UIDevice.current.beginGeneratingDeviceOrientationNotifications()
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(orientationDidChange),
+                name: UIDevice.orientationDidChangeNotification,
+                object: nil
+            )
+            updateVideoRotation()
             logger.info("Capture session started")
         } catch {
             self.error = error.localizedDescription
@@ -74,6 +83,8 @@ final class CaptureManager: NSObject {
     }
 
     func stop() {
+        NotificationCenter.default.removeObserver(self, name: UIDevice.orientationDidChangeNotification, object: nil)
+        UIDevice.current.endGeneratingDeviceOrientationNotifications()
         captureSession.stopRunning()
         encoderBridge.stop()
         isRunning = false
@@ -108,7 +119,7 @@ final class CaptureManager: NSObject {
         captureSession.addOutput(videoOutput)
 
         if let connection = videoOutput.connection(with: .video) {
-            connection.videoRotationAngle = 90
+            connection.videoRotationAngle = Self.rotationAngle(for: UIDevice.current.orientation)
         }
 
         guard let microphone = AVCaptureDevice.default(for: .audio) else {
@@ -126,6 +137,29 @@ final class CaptureManager: NSObject {
             throw CaptureError.cannotAddOutput
         }
         captureSession.addOutput(audioOutput)
+    }
+
+    @objc private nonisolated func orientationDidChange() {
+        Task { @MainActor in
+            updateVideoRotation()
+        }
+    }
+
+    private func updateVideoRotation() {
+        guard let connection = videoOutput.connection(with: .video) else { return }
+        let angle = Self.rotationAngle(for: UIDevice.current.orientation)
+        guard connection.videoRotationAngle != angle else { return }
+        connection.videoRotationAngle = angle
+        logger.info("Video rotation updated to \(angle)°")
+    }
+
+    private static func rotationAngle(for orientation: UIDeviceOrientation) -> CGFloat {
+        switch orientation {
+        case .landscapeLeft: return 0
+        case .landscapeRight: return 180
+        case .portraitUpsideDown: return 270
+        default: return 90
+        }
     }
 }
 

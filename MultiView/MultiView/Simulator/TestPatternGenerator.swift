@@ -21,7 +21,9 @@ enum TestPatternGenerator {
     static let width = 1280
     static let height = 720
 
-    static func createPixelBuffer(label: String, color: TestPatternColor) -> CVPixelBuffer? {
+    static func createPixelBuffer(label: String, color: TestPatternColor, landscape: Bool = false) -> CVPixelBuffer? {
+        let bufferWidth = landscape ? width : height
+        let bufferHeight = landscape ? height : width
         var pixelBuffer: CVPixelBuffer?
         let attrs: [String: Any] = [
             kCVPixelBufferCGImageCompatibilityKey as String: true,
@@ -29,7 +31,7 @@ enum TestPatternGenerator {
         ]
         let status = CVPixelBufferCreate(
             kCFAllocatorDefault,
-            width, height,
+            bufferWidth, bufferHeight,
             kCVPixelFormatType_32BGRA,
             attrs as CFDictionary,
             &pixelBuffer
@@ -45,15 +47,15 @@ enum TestPatternGenerator {
         let colorSpace = CGColorSpaceCreateDeviceRGB()
         guard let context = CGContext(
             data: baseAddress,
-            width: width,
-            height: height,
+            width: bufferWidth,
+            height: bufferHeight,
             bitsPerComponent: 8,
             bytesPerRow: bytesPerRow,
             space: colorSpace,
             bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue
         ) else { return nil }
 
-        drawTestPattern(in: context, label: label, color: color)
+        drawTestPattern(in: context, width: bufferWidth, height: bufferHeight, label: label, color: color)
         return buffer
     }
 
@@ -92,9 +94,9 @@ enum TestPatternGenerator {
         .white, .yellow, .cyan, .green, .magenta, .red, .blue
     ]
 
-    private static func drawTestPattern(in context: CGContext, label: String, color: TestPatternColor) {
-        let w = CGFloat(width)
-        let h = CGFloat(height)
+    private static func drawTestPattern(in context: CGContext, width w: Int, height h: Int, label: String, color: TestPatternColor) {
+        let w = CGFloat(w)
+        let h = CGFloat(h)
 
         context.setFillColor(color.uiColor.cgColor)
         context.fill(CGRect(x: 0, y: 0, width: w, height: h))

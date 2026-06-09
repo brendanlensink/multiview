@@ -16,7 +16,7 @@ final class SimulatorSession {
 
     let simulatedPeers: [MCPeerID] = [
         MCPeerID(displayName: "Camera 1"),
-        MCPeerID(displayName: "Camera 2"),
+        MCPeerID(displayName: "Camera 2 (landscape)"),
     ]
 
     private var localPixelBuffer: CVPixelBuffer?
@@ -39,9 +39,11 @@ final class SimulatorSession {
 
         let colors: [TestPatternColor] = [.green, .orange, .purple]
         for (i, peer) in simulatedPeers.enumerated() {
+            let isLandscape = peer.displayName.contains("landscape")
             peerPixelBuffers[peer] = TestPatternGenerator.createPixelBuffer(
                 label: peer.displayName,
-                color: colors[i % colors.count]
+                color: colors[i % colors.count],
+                landscape: isLandscape
             )
         }
 

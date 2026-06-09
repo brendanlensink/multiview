@@ -70,6 +70,9 @@ final class PeerVideoManager {
         decoder.onSampleBuffer = { [weak layer] sampleBuffer in
             layer?.enqueue(sampleBuffer)
         }
+        decoder.onFormatChanged = { [weak layer] in
+            layer?.flush()
+        }
 
         decoders[peer] = decoder
         displayLayers[peer] = layer

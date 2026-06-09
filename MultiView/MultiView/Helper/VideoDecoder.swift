@@ -7,6 +7,7 @@ final class VideoDecoder: @unchecked Sendable {
     private var formatDescription: CMFormatDescription?
     var onSampleBuffer: (@Sendable (CMSampleBuffer) -> Void)?
     var onRecordSampleBuffer: (@Sendable (CMSampleBuffer) -> Void)?
+    var onFormatChanged: (@Sendable () -> Void)?
 
     func decode(packet: FramePacket) {
         if packet.isKeyFrame, let paramData = packet.parameterSets {
@@ -81,7 +82,11 @@ final class VideoDecoder: @unchecked Sendable {
         }
 
         if formatDescription == nil || !CMFormatDescriptionEqual(formatDescription!, otherFormatDescription: newFormatDesc) {
+            let wasNil = formatDescription == nil
             formatDescription = newFormatDesc
+            if !wasNil {
+                onFormatChanged?()
+            }
         }
     }
 
