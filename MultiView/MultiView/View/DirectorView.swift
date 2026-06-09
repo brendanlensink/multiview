@@ -2,39 +2,6 @@ import AVFoundation
 import MultipeerConnectivity
 import SwiftUI
 
-// MARK: - Grid Layout
-
-private struct GridLayout {
-    let columns: Int
-    let rows: Int
-
-    static func forPeerCount(_ count: Int, in size: CGSize) -> GridLayout {
-        switch count {
-        case 0, 1:
-            return GridLayout(columns: 1, rows: 1)
-        case 2:
-            let isLandscape = size.width > size.height
-            return GridLayout(columns: isLandscape ? 2 : 1, rows: isLandscape ? 1 : 2)
-        default:
-            let rows = (count + 1) / 2
-            return GridLayout(columns: 2, rows: rows)
-        }
-    }
-
-    func cellFrame(at index: Int, in size: CGSize) -> CGRect {
-        let col = index % columns
-        let row = index / columns
-        let cellWidth = size.width / CGFloat(columns)
-        let cellHeight = size.height / CGFloat(rows)
-        return CGRect(
-            x: CGFloat(col) * cellWidth,
-            y: CGFloat(row) * cellHeight,
-            width: cellWidth,
-            height: cellHeight
-        )
-    }
-}
-
 // MARK: - Director View
 
 struct DirectorView: View {
@@ -50,6 +17,7 @@ struct DirectorView: View {
     @State private var completedSession: RecordingSession?
     @State private var disconnectedPeers: Set<MCPeerID> = []
     @State private var disconnectTimers: [MCPeerID: Task<Void, Never>] = [:]
+    @State private var layoutManager = FeedLayoutManager()
     #if targetEnvironment(simulator)
     @State private var simulatorSession: SimulatorSession?
     #endif
@@ -261,37 +229,105 @@ struct DirectorView: View {
     private var videoGrid: some View {
         let connectedPeers = connectivity.connectedPeers
         let allVisiblePeers = connectedPeers + disconnectedPeers.filter { !connectedPeers.contains($0) }
-        let totalCells = allVisiblePeers.count + 1
+        let feedIDs: [FeedID] = [.director] + allVisiblePeers.map { .peer($0) }
 
         return GeometryReader { geometry in
-            let size = geometry.size
-            let grid = GridLayout.forPeerCount(totalCells, in: size)
-            let directorCell = grid.cellFrame(at: 0, in: size)
-
             ZStack {
-                PeerVideoCell(
+                InteractiveFeedCell(
+                    feedID: .director,
+                    layoutManager: layoutManager,
                     peerName: "Director",
                     displayLayer: localDisplayLayer,
                     isLocal: true
                 )
-                .frame(width: directorCell.width, height: directorCell.height)
-                .position(x: directorCell.midX, y: directorCell.midY)
 
-                ForEach(Array(allVisiblePeers.enumerated()), id: \.element) { index, peer in
-                    let cell = grid.cellFrame(at: index + 1, in: size)
-                    let isDisconnected = disconnectedPeers.contains(peer)
-
-                    PeerVideoCell(
+                ForEach(allVisiblePeers, id: \.self) { peer in
+                    InteractiveFeedCell(
+                        feedID: .peer(peer),
+                        layoutManager: layoutManager,
                         peerName: peer.displayName,
                         displayLayer: videoManager.displayLayers[peer],
-                        isDisconnected: isDisconnected
+                        isDisconnected: disconnectedPeers.contains(peer)
                     )
-                    .frame(width: cell.width, height: cell.height)
-                    .position(x: cell.midX, y: cell.midY)
                     .transition(.opacity)
                 }
             }
-            .animation(.smooth(duration: 0.35), value: allVisiblePeers)
+            .onAppear {
+                layoutManager.recalculateGrid(feeds: feedIDs, in: geometry.size)
+            }
+            .onChange(of: allVisiblePeers) {
+                let visible = connectivity.connectedPeers + disconnectedPeers.filter { !connectivity.connectedPeers.contains($0) }
+                let ids: [FeedID] = [.director] + visible.map { .peer($0) }
+                layoutManager.recalculateGrid(feeds: ids, in: geometry.size)
+            }
+            .onChange(of: geometry.size) { _, newSize in
+                layoutManager.recalculateGrid(feeds: feedIDs, in: newSize)
+            }
+        }
+    }
+}
+
+// MARK: - Interactive Feed Cell
+
+private struct InteractiveFeedCell: View {
+    let feedID: FeedID
+    let layoutManager: FeedLayoutManager
+    let peerName: String
+    let displayLayer: SampleBufferDisplayLayer?
+    var isLocal: Bool = false
+    var isDisconnected: Bool = false
+
+    @State private var dragAnchor: CGPoint?
+    @State private var pinchAnchor: CGSize?
+
+    var body: some View {
+        if let frame = layoutManager.frames[feedID] {
+            let isActive = layoutManager.activeFeedID == feedID
+            PeerVideoCell(
+                peerName: peerName,
+                displayLayer: displayLayer,
+                isLocal: isLocal,
+                isDisconnected: isDisconnected
+            )
+            .frame(width: frame.size.width, height: frame.size.height)
+            .position(frame.center)
+            .zIndex(isActive ? 1 : 0)
+            .shadow(color: isActive ? .white.opacity(0.3) : .clear, radius: isActive ? 8 : 0)
+            .animation(isActive ? nil : .easeOut(duration: 0.15), value: frame)
+            .gesture(
+                DragGesture(minimumDistance: 5)
+                    .onChanged { value in
+                        if dragAnchor == nil {
+                            dragAnchor = layoutManager.frames[feedID]?.center
+                        }
+                        guard let anchor = dragAnchor else { return }
+                        layoutManager.setFeedCenter(feedID, CGPoint(
+                            x: anchor.x + value.translation.width,
+                            y: anchor.y + value.translation.height
+                        ))
+                    }
+                    .onEnded { _ in
+                        dragAnchor = nil
+                        layoutManager.endGesture()
+                    }
+            )
+            .simultaneousGesture(
+                MagnifyGesture()
+                    .onChanged { value in
+                        if pinchAnchor == nil {
+                            pinchAnchor = layoutManager.frames[feedID]?.size
+                        }
+                        guard let anchor = pinchAnchor else { return }
+                        layoutManager.setFeedSize(feedID, CGSize(
+                            width: anchor.width * value.magnification,
+                            height: anchor.height * value.magnification
+                        ))
+                    }
+                    .onEnded { _ in
+                        pinchAnchor = nil
+                        layoutManager.endGesture()
+                    }
+            )
         }
     }
 }
