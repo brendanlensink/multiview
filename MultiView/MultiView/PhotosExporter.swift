@@ -19,6 +19,22 @@ struct PhotosExporter {
         }
     }
 
+    static func saveVideoToPhotos(_ url: URL) async throws {
+        try await requestAccessIfNeeded()
+
+        do {
+            try await PHPhotoLibrary.shared().performChanges {
+                PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: url)
+            }
+            logger.info("Saved composite video to Photos")
+        } catch {
+            logger.error("Failed to save composite: \(error.localizedDescription)")
+            throw ExportError.saveFailed(fileCount: 1)
+        }
+
+        try? FileManager.default.removeItem(at: url)
+    }
+
     static func exportSession(_ session: RecordingSession) async throws {
         try await requestAccessIfNeeded()
 
