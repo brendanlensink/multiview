@@ -35,13 +35,16 @@ struct PhotosExporter {
         try? FileManager.default.removeItem(at: url)
     }
 
-    static func exportSession(_ session: RecordingSession) async throws {
+    static func exportSession(_ session: RecordingSession, onProgress: (@Sendable (Int, Int) -> Void)? = nil) async throws {
         try await requestAccessIfNeeded()
 
         let sessionDir = RecordingStore.directoryURL(for: session)
+        let total = session.streams.count
         var failCount = 0
 
-        for stream in session.streams {
+        for (index, stream) in session.streams.enumerated() {
+            onProgress?(index, total)
+
             let fileURL = sessionDir.appendingPathComponent(stream.fileName)
             guard FileManager.default.fileExists(atPath: fileURL.path) else {
                 logger.warning("Recording file missing for stream '\(stream.label)': \(fileURL.lastPathComponent)")
@@ -59,6 +62,8 @@ struct PhotosExporter {
                 failCount += 1
             }
         }
+
+        onProgress?(total, total)
 
         if failCount > 0 {
             throw ExportError.saveFailed(fileCount: failCount)
