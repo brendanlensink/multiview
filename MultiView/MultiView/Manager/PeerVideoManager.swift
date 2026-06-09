@@ -43,6 +43,21 @@ final class PeerVideoManager {
         }
     }
 
+    #if targetEnvironment(simulator)
+    func enqueueSimulatedFrame(_ sampleBuffer: CMSampleBuffer, from peer: MCPeerID) {
+        let layer = ensureDisplayLayer(for: peer)
+        layer.enqueue(sampleBuffer)
+    }
+
+    private func ensureDisplayLayer(for peer: MCPeerID) -> SampleBufferDisplayLayer {
+        if let layer = displayLayers[peer] { return layer }
+        let layer = SampleBufferDisplayLayer()
+        displayLayers[peer] = layer
+        logger.info("Created display layer for simulated peer \(peer.displayName)")
+        return layer
+    }
+    #endif
+
     // MARK: - Private
 
     private func decoderAndLayer(for peer: MCPeerID) -> (VideoDecoder, SampleBufferDisplayLayer) {
