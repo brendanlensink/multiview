@@ -184,6 +184,15 @@ final class ConnectivityManager: NSObject {
         }
     }
 
+    // MARK: - Simulator Support
+
+    #if targetEnvironment(simulator)
+    func simulateConnectedPeers(_ peers: [MCPeerID]) {
+        connectedPeers = peers
+        connectionState = .connected
+    }
+    #endif
+
     // MARK: - Peer ID Persistence
 
     private static func loadOrCreatePeerID() -> MCPeerID {

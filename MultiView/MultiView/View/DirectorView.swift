@@ -50,6 +50,9 @@ struct DirectorView: View {
     @State private var completedSession: RecordingSession?
     @State private var disconnectedPeers: Set<MCPeerID> = []
     @State private var disconnectTimers: [MCPeerID: Task<Void, Never>] = [:]
+    #if targetEnvironment(simulator)
+    @State private var simulatorSession: SimulatorSession?
+    #endif
 
     var body: some View {
         directorContent
@@ -80,6 +83,15 @@ struct DirectorView: View {
             recordingOverlay
         }
         .onAppear {
+            #if targetEnvironment(simulator)
+            let session = SimulatorSession(
+                peerVideoManager: videoManager,
+                localDisplayLayer: localDisplayLayer,
+                connectivity: connectivity
+            )
+            simulatorSession = session
+            session.start()
+            #else
             captureManager.onRawSampleBuffer = { [localDisplayLayer, recordingManager] sampleBuffer in
                 localDisplayLayer.enqueue(sampleBuffer)
                 recordingManager.appendLocalSample(sampleBuffer)
@@ -97,8 +109,13 @@ struct DirectorView: View {
                 }
             }
             connectivity.startAdvertising()
+            #endif
         }
         .onDisappear {
+            #if targetEnvironment(simulator)
+            simulatorSession?.stop()
+            simulatorSession = nil
+            #else
             if recordingManager.isRecording {
                 videoManager.clearRecordingCallbacks()
                 Task { _ = await recordingManager.stopRecording() }
@@ -108,6 +125,7 @@ struct DirectorView: View {
             captureManager.onAudioSampleBuffer = nil
             captureManager.stop()
             conditionManager.stopMonitoring()
+            #endif
 
             for timer in disconnectTimers.values { timer.cancel() }
             disconnectTimers.removeAll()

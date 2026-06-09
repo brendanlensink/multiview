@@ -35,6 +35,8 @@ All source lives under `MultiView/MultiView/`:
 | `PhotosExporter.swift` | Exports recording sessions to the Photos library via `PHPhotoLibrary`, cleans up temp files on success |
 | `GridCompositor.swift` | Composites multiple angle recordings into a single split-screen video via `AVMutableComposition` + `AVVideoComposition` |
 | `ExportOptionsSheet.swift` | Post-recording export UI — choose between separate files or grid composite export |
+| `TestPatternGenerator.swift` | Generates static test pattern `CVPixelBuffer`s with colored bars and labels (simulator only) |
+| `SimulatorSession.swift` | Orchestrates mock video feeds and fake peers for simulator testing (simulator only) |
 
 ## Video Pipeline
 
@@ -96,3 +98,14 @@ tmp/recordings/<session-uuid>/
 - `ConnectivityManager` peer connect/disconnect callbacks — use for reacting to topology changes.
 - `TimeSyncManager` — provides clock offset per peer so presentation timestamps can be aligned across streams.
 - `Info.plist` declares Camera, Microphone, Local Network, Bonjour, and Photo Library Add permissions.
+
+## Simulator Support
+
+On the iOS Simulator, the Director role runs in a debug mode that replaces real hardware dependencies with mocks. All simulator code is guarded by `#if targetEnvironment(simulator)` and compiles out of device builds.
+
+**What's mocked:**
+- **Camera capture** — `SimulatorSession` generates static test pattern frames via `TestPatternGenerator` instead of using `AVCaptureSession`.
+- **Peer connectivity** — Two fake `MCPeerID` peers ("Camera 1", "Camera 2") are injected into `ConnectivityManager.connectedPeers` via `simulateConnectedPeers(_:)`. No actual `MCSession` advertising or browsing occurs.
+- **Video pipeline** — Mock frames bypass the encode/decode pipeline entirely. `PeerVideoManager.enqueueSimulatedFrame(_:from:)` feeds `CMSampleBuffer`s directly to display layers.
+
+**What's NOT mocked:** Recording, export, and Photos integration are unchanged — they won't produce useful output on the simulator since the mock frames are static patterns, but the UI flow (start/stop recording, export sheet) still exercises.
