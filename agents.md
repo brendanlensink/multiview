@@ -15,7 +15,8 @@ All source lives under `MultiView/MultiView/`:
 | File | Role |
 |------|------|
 | `ContentView.swift` | Root view, role selection (Director vs Camera) |
-| `DirectorView.swift` | Director UI — displays grid of all camera feeds |
+| `DirectorView.swift` | Director UI — displays interactive grid of all camera feeds with drag-to-move and pinch-to-resize |
+| `FeedLayoutManager.swift` | Manages feed positions/sizes, handles overlap resolution when feeds are dragged or resized |
 | `CameraView.swift` | Camera participant UI — streams video to director |
 | `CameraPreviewView.swift` | Local camera preview |
 | `SampleBufferVideoView.swift` | Wraps `AVSampleBufferDisplayLayer` for rendering decoded frames |
