@@ -5,6 +5,7 @@ struct ExportOptionsSheet: View {
     let onDismiss: () -> Void
 
     @State private var isExporting = false
+    @State private var exportProgress: String?
     @State private var exportError: String?
 
     var body: some View {
@@ -24,12 +25,16 @@ struct ExportOptionsSheet: View {
                     }
                     .disabled(isExporting)
 
-                    ExportOptionRow(
-                        title: "Save as grid composite",
-                        subtitle: "Coming soon",
-                        systemImage: "square.grid.2x2"
-                    )
-                    .opacity(0.4)
+                    Button {
+                        exportGridComposite()
+                    } label: {
+                        ExportOptionRow(
+                            title: "Save as grid composite",
+                            subtitle: "Combined split-screen video",
+                            systemImage: "square.grid.2x2"
+                        )
+                    }
+                    .disabled(isExporting)
                 }
 
                 if let exportError {
@@ -53,7 +58,7 @@ struct ExportOptionsSheet: View {
             }
             .overlay {
                 if isExporting {
-                    ProgressView("Saving to Photos...")
+                    ProgressView(exportProgress ?? "Exporting...")
                         .padding()
                         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
                 }
@@ -75,9 +80,28 @@ struct ExportOptionsSheet: View {
     private func exportSeparateFiles() {
         isExporting = true
         exportError = nil
+        exportProgress = "Saving to Photos..."
         Task {
             do {
                 try await PhotosExporter.exportSession(session)
+                onDismiss()
+            } catch {
+                exportError = error.localizedDescription
+                isExporting = false
+            }
+        }
+    }
+
+    private func exportGridComposite() {
+        isExporting = true
+        exportError = nil
+        exportProgress = "Compositing grid..."
+        Task {
+            do {
+                let compositeURL = try await GridCompositor.composite(session)
+                exportProgress = "Saving to Photos..."
+                try await PhotosExporter.saveVideoToPhotos(compositeURL)
+                RecordingStore.deleteSession(session)
                 onDismiss()
             } catch {
                 exportError = error.localizedDescription

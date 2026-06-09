@@ -33,6 +33,8 @@ All source lives under `MultiView/MultiView/`:
 | `RecordingSession.swift` | Codable metadata model for a completed recording (streams, timestamps, duration) |
 | `RecordingStore.swift` | Manages recording temp directory — lists completed sessions, cleans up orphaned recordings |
 | `PhotosExporter.swift` | Exports recording sessions to the Photos library via `PHPhotoLibrary`, cleans up temp files on success |
+| `GridCompositor.swift` | Composites multiple angle recordings into a single split-screen video via `AVMutableComposition` + `AVVideoComposition` |
+| `ExportOptionsSheet.swift` | Post-recording export UI — choose between separate files or grid composite export |
 
 ## Video Pipeline
 
@@ -79,9 +81,13 @@ tmp/recordings/<session-uuid>/
 1. Start → create session dir, write `.recording` marker, start `StreamRecorder`s
 2. Stop → finalize all writers, write `session.json`, remove `.recording` marker
 3. App launch → `RecordingStore.cleanupIncompleteRecordings()` deletes dirs with a `.recording` marker or missing `session.json`
-4. Export → `PhotosExporter.exportSession()` saves each `.mov` to Photos via `PHPhotoLibrary`, then `RecordingStore.deleteSession()` removes the temp dir
+4. Export → user chooses export mode in `ExportOptionsSheet`:
+   - **Separate files** → `PhotosExporter.exportSession()` saves each `.mov` to Photos
+   - **Grid composite** → `GridCompositor.composite()` merges all angles into a single split-screen `.mov` via `AVMutableComposition` + `AVVideoComposition`, then `PhotosExporter.saveVideoToPhotos()` saves it
 
-**Export integration:** `RecordingStore.completedSessions()` returns `[RecordingSession]` sorted newest-first. Each session has stream metadata and file references. Use `RecordingStore.fileURL(for:in:)` to resolve `.mov` paths. Currently, export to Photos triggers automatically after recording stops in `DirectorView`.
+**Export integration:** `RecordingStore.completedSessions()` returns `[RecordingSession]` sorted newest-first. Each session has stream metadata and file references. Use `RecordingStore.fileURL(for:in:)` to resolve `.mov` paths. After recording stops, `DirectorView` presents `ExportOptionsSheet` for the user to choose an export mode.
+
+**Grid composite layout:** `GridCompositor` arranges angles in a 1920x1080 output — 1 angle = full screen, 2 = side-by-side, 3–4 = 2×2 grid (black fill for empty cell). Audio comes from the director's stream only. Each angle is aspect-fit into its grid cell with the source `preferredTransform` applied.
 
 ## Key Integration Points
 
