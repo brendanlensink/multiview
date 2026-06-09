@@ -24,7 +24,7 @@ struct GridCompositor {
         }
     }
 
-    static func composite(_ session: RecordingSession) async throws -> URL {
+    static func composite(_ session: RecordingSession, onProgress: (@Sendable (Float) -> Void)? = nil) async throws -> URL {
         let streams = session.streams
         guard !streams.isEmpty else { throw CompositorError.noStreams }
 
@@ -126,7 +126,21 @@ struct GridCompositor {
         }
 
         exportSession.videoComposition = videoComposition
-        try await exportSession.export(to: outputURL, as: .mov)
+
+        if let onProgress {
+            nonisolated(unsafe) let session = exportSession
+            let progressTask = Task.detached {
+                while !Task.isCancelled {
+                    onProgress(session.progress)
+                    try await Task.sleep(for: .milliseconds(100))
+                }
+            }
+            try await exportSession.export(to: outputURL, as: .mov)
+            progressTask.cancel()
+            onProgress(1.0)
+        } else {
+            try await exportSession.export(to: outputURL, as: .mov)
+        }
 
         logger.info("Grid composite exported to \(outputURL.lastPathComponent)")
         return outputURL

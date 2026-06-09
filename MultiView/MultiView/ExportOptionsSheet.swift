@@ -4,45 +4,22 @@ struct ExportOptionsSheet: View {
     let session: RecordingSession
     let onDismiss: () -> Void
 
-    @State private var isExporting = false
-    @State private var exportProgress: String?
-    @State private var exportError: String?
+    @State private var phase: ExportPhase = .choosingOption
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 20) {
                 headerInfo
 
-                VStack(spacing: 12) {
-                    Button {
-                        exportSeparateFiles()
-                    } label: {
-                        ExportOptionRow(
-                            title: "Save as separate files",
-                            subtitle: "\(session.streams.count) videos to Photos",
-                            systemImage: "square.and.arrow.down.on.square"
-                        )
-                    }
-                    .disabled(isExporting)
-
-                    Button {
-                        exportGridComposite()
-                    } label: {
-                        ExportOptionRow(
-                            title: "Save as grid composite",
-                            subtitle: "Combined split-screen video",
-                            systemImage: "square.grid.2x2"
-                        )
-                    }
-                    .disabled(isExporting)
-                }
-
-                if let exportError {
-                    Text(exportError)
-                        .font(.caption)
-                        .foregroundStyle(.red)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal)
+                switch phase {
+                case .choosingOption:
+                    optionButtons
+                case .exporting(let status, let progress):
+                    exportProgressView(status: status, progress: progress)
+                case .success:
+                    exportSuccessView
+                case .failed(let message):
+                    exportFailedView(message: message)
                 }
 
                 Spacer()
@@ -52,18 +29,18 @@ struct ExportOptionsSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { onDismiss() }
-                        .disabled(isExporting)
-                }
-            }
-            .overlay {
-                if isExporting {
-                    ProgressView(exportProgress ?? "Exporting...")
-                        .padding()
-                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+                    if case .failed = phase {
+                        Button("Done") { onDismiss() }
+                    } else if case .success = phase {
+                        EmptyView()
+                    } else {
+                        Button("Cancel") { onDismiss() }
+                            .disabled(phase.isExporting)
+                    }
                 }
             }
         }
+        .interactiveDismissDisabled(phase.isExporting)
     }
 
     private var headerInfo: some View {
@@ -77,37 +54,137 @@ struct ExportOptionsSheet: View {
         }
     }
 
+    private var optionButtons: some View {
+        VStack(spacing: 12) {
+            Button {
+                exportSeparateFiles()
+            } label: {
+                ExportOptionRow(
+                    title: "Save as separate files",
+                    subtitle: "\(session.streams.count) videos to Photos",
+                    systemImage: "square.and.arrow.down.on.square"
+                )
+            }
+
+            Button {
+                exportGridComposite()
+            } label: {
+                ExportOptionRow(
+                    title: "Save as grid composite",
+                    subtitle: "Combined split-screen video",
+                    systemImage: "square.grid.2x2"
+                )
+            }
+        }
+    }
+
+    private func exportProgressView(status: String, progress: Double) -> some View {
+        VStack(spacing: 16) {
+            Spacer()
+
+            ProgressView(value: progress)
+                .tint(.blue)
+
+            Text(status)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+            Spacer()
+        }
+        .padding(.horizontal)
+    }
+
+    private var exportSuccessView: some View {
+        VStack(spacing: 12) {
+            Spacer()
+
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 48))
+                .foregroundStyle(.green)
+
+            Text("Saved to Photos")
+                .font(.headline)
+
+            Spacer()
+        }
+        .onAppear {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+                onDismiss()
+            }
+        }
+    }
+
+    private func exportFailedView(message: String) -> some View {
+        VStack(spacing: 12) {
+            Spacer()
+
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 48))
+                .foregroundStyle(.red)
+
+            Text("Export Failed")
+                .font(.headline)
+
+            Text(message)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal)
+
+            Spacer()
+        }
+    }
+
     private func exportSeparateFiles() {
-        isExporting = true
-        exportError = nil
-        exportProgress = "Saving to Photos..."
+        phase = .exporting(status: "Preparing…", progress: 0)
         Task {
             do {
-                try await PhotosExporter.exportSession(session)
-                onDismiss()
+                try await PhotosExporter.exportSession(session) { @Sendable completed, total in
+                    let fraction = Double(completed) / Double(max(total, 1))
+                    let status = "Saving file \(completed + 1) of \(total)…"
+                    Task { @MainActor in
+                        phase = .exporting(status: status, progress: fraction)
+                    }
+                }
+                phase = .success
             } catch {
-                exportError = error.localizedDescription
-                isExporting = false
+                phase = .failed(error.localizedDescription)
             }
         }
     }
 
     private func exportGridComposite() {
-        isExporting = true
-        exportError = nil
-        exportProgress = "Compositing grid..."
+        phase = .exporting(status: "Compositing grid…", progress: 0)
         Task {
             do {
-                let compositeURL = try await GridCompositor.composite(session)
-                exportProgress = "Saving to Photos..."
+                let compositeURL = try await GridCompositor.composite(session) { @Sendable progress in
+                    Task { @MainActor in
+                        phase = .exporting(
+                            status: "Compositing grid…",
+                            progress: Double(progress) * 0.9
+                        )
+                    }
+                }
+                phase = .exporting(status: "Saving to Photos…", progress: 0.95)
                 try await PhotosExporter.saveVideoToPhotos(compositeURL)
                 RecordingStore.deleteSession(session)
-                onDismiss()
+                phase = .success
             } catch {
-                exportError = error.localizedDescription
-                isExporting = false
+                phase = .failed(error.localizedDescription)
             }
         }
+    }
+}
+
+private enum ExportPhase: Equatable {
+    case choosingOption
+    case exporting(status: String, progress: Double)
+    case success
+    case failed(String)
+
+    var isExporting: Bool {
+        if case .exporting = self { return true }
+        return false
     }
 }
 
