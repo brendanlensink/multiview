@@ -1,4 +1,5 @@
 import AVFoundation
+import MultipeerConnectivity
 import SwiftUI
 
 // MARK: - Grid Layout
@@ -46,6 +47,8 @@ struct DirectorView: View {
     @State private var isTransitioning = false
     @State private var recordingStartDate: Date?
     @State private var completedSession: RecordingSession?
+    @State private var disconnectedPeers: Set<MCPeerID> = []
+    @State private var disconnectTimers: [MCPeerID: Task<Void, Never>] = [:]
 
     var body: some View {
         directorContent
@@ -103,6 +106,10 @@ struct DirectorView: View {
             captureManager.onAudioSampleBuffer = nil
             captureManager.stop()
 
+            for timer in disconnectTimers.values { timer.cancel() }
+            disconnectTimers.removeAll()
+            disconnectedPeers.removeAll()
+
             connectivity.onFrameReceived = nil
             connectivity.stopAdvertising()
             videoManager.removeAllPeers()
@@ -114,7 +121,16 @@ struct DirectorView: View {
                     videoManager.clearRecordingCallback(for: peer)
                     recordingManager.finalizePeerStream(peer)
                 }
-                videoManager.removePeer(peer)
+                showDisconnectedState(for: peer)
+            }
+
+            let reconnected = newPeers.filter { disconnectedPeers.contains($0) }
+            for peer in reconnected {
+                disconnectTimers[peer]?.cancel()
+                disconnectTimers.removeValue(forKey: peer)
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    disconnectedPeers.remove(peer)
+                }
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: AVCaptureSession.wasInterruptedNotification, object: captureManager.previewSource)) { notification in
@@ -168,6 +184,22 @@ struct DirectorView: View {
         .padding(16)
     }
 
+    private func showDisconnectedState(for peer: MCPeerID) {
+        disconnectTimers[peer]?.cancel()
+        withAnimation(.easeInOut(duration: 0.3)) {
+            disconnectedPeers.insert(peer)
+        }
+        disconnectTimers[peer] = Task {
+            try? await Task.sleep(for: .seconds(1.5))
+            guard !Task.isCancelled else { return }
+            withAnimation(.easeInOut(duration: 0.3)) {
+                disconnectedPeers.remove(peer)
+            }
+            disconnectTimers.removeValue(forKey: peer)
+            videoManager.removePeer(peer)
+        }
+    }
+
     private func startRecording() {
         guard !isTransitioning else { return }
         isTransitioning = true
@@ -199,8 +231,9 @@ struct DirectorView: View {
     }
 
     private var videoGrid: some View {
-        let peers = connectivity.connectedPeers
-        let totalCells = peers.count + 1
+        let connectedPeers = connectivity.connectedPeers
+        let allVisiblePeers = connectedPeers + disconnectedPeers.filter { !connectedPeers.contains($0) }
+        let totalCells = allVisiblePeers.count + 1
 
         return GeometryReader { geometry in
             let size = geometry.size
@@ -216,19 +249,21 @@ struct DirectorView: View {
                 .frame(width: directorCell.width, height: directorCell.height)
                 .position(x: directorCell.midX, y: directorCell.midY)
 
-                ForEach(Array(peers.enumerated()), id: \.element) { index, peer in
+                ForEach(Array(allVisiblePeers.enumerated()), id: \.element) { index, peer in
                     let cell = grid.cellFrame(at: index + 1, in: size)
+                    let isDisconnected = disconnectedPeers.contains(peer)
 
                     PeerVideoCell(
                         peerName: peer.displayName,
-                        displayLayer: videoManager.displayLayers[peer]
+                        displayLayer: videoManager.displayLayers[peer],
+                        isDisconnected: isDisconnected
                     )
                     .frame(width: cell.width, height: cell.height)
                     .position(x: cell.midX, y: cell.midY)
                     .transition(.opacity)
                 }
             }
-            .animation(.smooth(duration: 0.35), value: peers)
+            .animation(.smooth(duration: 0.35), value: allVisiblePeers)
         }
     }
 }
@@ -276,6 +311,7 @@ private struct PeerVideoCell: View {
     let peerName: String
     let displayLayer: SampleBufferDisplayLayer?
     var isLocal = false
+    var isDisconnected = false
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
@@ -285,6 +321,19 @@ private struct PeerVideoCell: View {
                 Color.black
                 ProgressView()
                     .tint(.white)
+            }
+
+            if isDisconnected {
+                Color.black.opacity(0.6)
+                VStack(spacing: 8) {
+                    Image(systemName: "wifi.slash")
+                        .font(.title2)
+                    Text("Disconnected")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                }
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
 
             Text(peerName)
