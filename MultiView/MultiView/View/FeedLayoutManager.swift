@@ -4,6 +4,13 @@ import SwiftUI
 enum FeedID: Hashable {
     case director
     case peer(MCPeerID)
+
+    var displayName: String {
+        switch self {
+        case .director: "Director"
+        case .peer(let peer): peer.displayName
+        }
+    }
 }
 
 @Observable
@@ -26,6 +33,7 @@ final class FeedLayoutManager {
     private(set) var activeFeedID: FeedID?
     var editingFeedID: FeedID?
     private(set) var containerSize: CGSize = .zero
+    var hiddenFeeds: Set<FeedID> = []
 
     private let minimumSide: CGFloat = 120
 

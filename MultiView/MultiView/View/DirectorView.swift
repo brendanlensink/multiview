@@ -18,6 +18,7 @@ struct DirectorView: View {
     @State private var disconnectedPeers: Set<MCPeerID> = []
     @State private var disconnectTimers: [MCPeerID: Task<Void, Never>] = [:]
     @State private var layoutManager = FeedLayoutManager()
+    @State private var showingCameraList = false
     #if targetEnvironment(simulator)
     @State private var simulatorSession: SimulatorSession?
     #endif
@@ -137,13 +138,17 @@ struct DirectorView: View {
 
     private var recordingOverlay: some View {
         VStack {
-            VStack(spacing: 4) {
-                if recordingManager.isRecording, let startDate = recordingStartDate {
-                    RecordingIndicator(startDate: startDate, lostStreamCount: recordingManager.lostStreamCount)
-                        .transition(.move(edge: .top).combined(with: .opacity))
+            HStack(alignment: .top) {
+                VStack(spacing: 4) {
+                    if recordingManager.isRecording, let startDate = recordingStartDate {
+                        RecordingIndicator(startDate: startDate, lostStreamCount: recordingManager.lostStreamCount)
+                            .transition(.move(edge: .top).combined(with: .opacity))
+                    }
+                    ThrottleIndicator(tier: conditionManager.qualityTier)
+                        .animation(.easeInOut, value: conditionManager.qualityTier)
                 }
-                ThrottleIndicator(tier: conditionManager.qualityTier)
-                    .animation(.easeInOut, value: conditionManager.qualityTier)
+                Spacer()
+                cameraListButton
             }
             Spacer()
             HStack {
@@ -152,6 +157,23 @@ struct DirectorView: View {
             }
         }
         .animation(.easeInOut(duration: 0.25), value: recordingManager.isRecording)
+    }
+
+    private var cameraListButton: some View {
+        Button {
+            showingCameraList = true
+        } label: {
+            Image(systemName: "video.fill")
+                .font(.system(size: 14))
+                .foregroundStyle(.white)
+                .padding(8)
+                .background(.black.opacity(0.5), in: Circle())
+        }
+        .padding(.top, 8)
+        .padding(.trailing, 16)
+        .popover(isPresented: $showingCameraList) {
+            CameraListPopover(layoutManager: layoutManager, allFeedIDs: allFeedIDs)
+        }
     }
 
     private var recordButton: some View {
@@ -190,6 +212,7 @@ struct DirectorView: View {
             guard !Task.isCancelled else { return }
             withAnimation(.easeInOut(duration: 0.3)) {
                 disconnectedPeers.remove(peer)
+                layoutManager.hiddenFeeds.remove(.peer(peer))
             }
             disconnectTimers.removeValue(forKey: peer)
             videoManager.removePeer(peer)
@@ -226,10 +249,20 @@ struct DirectorView: View {
         }
     }
 
-    private var videoGrid: some View {
+    private var allFeedIDs: [FeedID] {
         let connectedPeers = connectivity.connectedPeers
         let allVisiblePeers = connectedPeers + disconnectedPeers.filter { !connectedPeers.contains($0) }
-        let feedIDs: [FeedID] = [.director] + allVisiblePeers.map { .peer($0) }
+        return [.director] + allVisiblePeers.map { .peer($0) }
+    }
+
+    private var visibleFeedIDs: [FeedID] {
+        allFeedIDs.filter { !layoutManager.hiddenFeeds.contains($0) }
+    }
+
+    private var videoGrid: some View {
+        let visiblePeers = connectivity.connectedPeers.filter { !layoutManager.hiddenFeeds.contains(.peer($0)) }
+        let visibleDisconnected = disconnectedPeers.filter { !connectivity.connectedPeers.contains($0) && !layoutManager.hiddenFeeds.contains(.peer($0)) }
+        let allVisiblePeers = visiblePeers + visibleDisconnected
 
         return GeometryReader { geometry in
             ZStack {
@@ -241,13 +274,15 @@ struct DirectorView: View {
                         }
                     }
 
-                InteractiveFeedCell(
-                    feedID: .director,
-                    layoutManager: layoutManager,
-                    peerName: "Director",
-                    displayLayer: localDisplayLayer,
-                    isLocal: true
-                )
+                if !layoutManager.hiddenFeeds.contains(.director) {
+                    InteractiveFeedCell(
+                        feedID: .director,
+                        layoutManager: layoutManager,
+                        peerName: "Director",
+                        displayLayer: localDisplayLayer,
+                        isLocal: true
+                    )
+                }
 
                 ForEach(allVisiblePeers, id: \.self) { peer in
                     InteractiveFeedCell(
@@ -261,15 +296,16 @@ struct DirectorView: View {
                 }
             }
             .onAppear {
-                layoutManager.recalculateGrid(feeds: feedIDs, in: geometry.size)
+                layoutManager.recalculateGrid(feeds: visibleFeedIDs, in: geometry.size)
             }
             .onChange(of: allVisiblePeers) {
-                let visible = connectivity.connectedPeers + disconnectedPeers.filter { !connectivity.connectedPeers.contains($0) }
-                let ids: [FeedID] = [.director] + visible.map { .peer($0) }
-                layoutManager.recalculateGrid(feeds: ids, in: geometry.size)
+                layoutManager.recalculateGrid(feeds: visibleFeedIDs, in: geometry.size)
+            }
+            .onChange(of: layoutManager.hiddenFeeds) {
+                layoutManager.recalculateGrid(feeds: visibleFeedIDs, in: geometry.size)
             }
             .onChange(of: geometry.size) { _, newSize in
-                layoutManager.recalculateGrid(feeds: feedIDs, in: newSize)
+                layoutManager.recalculateGrid(feeds: visibleFeedIDs, in: newSize)
             }
         }
     }
@@ -299,10 +335,24 @@ private struct InteractiveFeedCell: View {
                 isDisconnected: isDisconnected
             )
             .frame(width: frame.size.width, height: frame.size.height)
-            .overlay {
+            .overlay(alignment: .topTrailing) {
                 if isEditing {
                     RoundedRectangle(cornerRadius: 4)
                         .strokeBorder(.red, lineWidth: 3)
+
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            layoutManager.hiddenFeeds.insert(feedID)
+                            layoutManager.editingFeedID = nil
+                        }
+                    } label: {
+                        Image(systemName: "eye.slash.fill")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.white)
+                            .padding(6)
+                            .background(.black.opacity(0.7), in: Circle())
+                    }
+                    .padding(6)
                 }
             }
             .position(frame.center)
@@ -439,6 +489,54 @@ private struct PeerVideoCell: View {
                     .strokeBorder(.blue, lineWidth: 2)
             }
         }
+    }
+}
+
+// MARK: - Camera List Popover
+
+private struct CameraListPopover: View {
+    let layoutManager: FeedLayoutManager
+    let allFeedIDs: [FeedID]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Cameras")
+                .font(.headline)
+                .padding(.horizontal, 16)
+                .padding(.top, 16)
+                .padding(.bottom, 8)
+
+            ForEach(Array(allFeedIDs.enumerated()), id: \.element) { _, feedID in
+                let isHidden = layoutManager.hiddenFeeds.contains(feedID)
+                Button {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        if isHidden {
+                            layoutManager.hiddenFeeds.remove(feedID)
+                        } else {
+                            layoutManager.hiddenFeeds.insert(feedID)
+                        }
+                    }
+                } label: {
+                    HStack {
+                        Image(systemName: feedID == .director ? "video.fill" : "camera.fill")
+                            .foregroundStyle(.secondary)
+                            .frame(width: 20)
+                        Text(feedID.displayName)
+                            .foregroundStyle(isHidden ? .secondary : .primary)
+                        Spacer()
+                        Image(systemName: isHidden ? "eye.slash" : "eye")
+                            .foregroundColor(isHidden ? .secondary : .blue)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.bottom, 12)
+        .frame(minWidth: 220)
+        .presentationCompactAdaptation(.popover)
     }
 }
 
