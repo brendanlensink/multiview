@@ -139,22 +139,20 @@ struct DirectorView: View {
     private var recordingOverlay: some View {
         VStack {
             HStack(alignment: .top) {
-                VStack(spacing: 4) {
-                    if recordingManager.isRecording, let startDate = recordingStartDate {
-                        RecordingIndicator(startDate: startDate, lostStreamCount: recordingManager.lostStreamCount)
-                            .transition(.move(edge: .top).combined(with: .opacity))
-                    }
-                    ThrottleIndicator(tier: conditionManager.qualityTier)
-                        .animation(.easeInOut, value: conditionManager.qualityTier)
-                }
+                ThrottleIndicator(tier: conditionManager.qualityTier)
+                    .animation(.easeInOut, value: conditionManager.qualityTier)
                 Spacer()
                 cameraListButton
             }
             Spacer()
-            HStack {
-                Spacer()
+            VStack(spacing: 12) {
+                if recordingManager.isRecording, let startDate = recordingStartDate {
+                    RecordingIndicator(startDate: startDate, lostStreamCount: recordingManager.lostStreamCount)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
                 recordButton
             }
+            .padding(.bottom, 20)
         }
         .animation(.easeInOut(duration: 0.25), value: recordingManager.isRecording)
     }
@@ -184,22 +182,24 @@ struct DirectorView: View {
                 startRecording()
             }
         } label: {
-            Circle()
-                .fill(recordingManager.isRecording ? .red : .white)
-                .frame(width: 28, height: 28)
-                .overlay {
-                    if recordingManager.isRecording {
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(.white)
-                            .frame(width: 12, height: 12)
-                    }
+            ZStack {
+                Circle()
+                    .strokeBorder(.white, lineWidth: 4)
+                    .frame(width: 68, height: 68)
+
+                if recordingManager.isRecording {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(.red)
+                        .frame(width: 28, height: 28)
+                } else {
+                    Circle()
+                        .fill(.red)
+                        .frame(width: 58, height: 58)
                 }
-                .padding(6)
-                .background(.black.opacity(0.5), in: Circle())
+            }
         }
         .disabled(isTransitioning)
         .opacity(isTransitioning ? 0.5 : 1)
-        .padding(16)
     }
 
     private func showDisconnectedState(for peer: MCPeerID) {
