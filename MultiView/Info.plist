@@ -2,16 +2,6 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>CFBundleDisplayName</key>
-	<string>Coverage</string>
-	<key>NSCameraUsageDescription</key>
-	<string>Coverage needs camera access to capture video from this device.</string>
-	<key>NSMicrophoneUsageDescription</key>
-	<string>Coverage needs microphone access to record audio on the director device.</string>
-	<key>NSLocalNetworkUsageDescription</key>
-	<string>Coverage needs local network access to connect devices for multi-angle video capture.</string>
-	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>Coverage needs photo library access to save your recordings.</string>
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_multiview._tcp</string>

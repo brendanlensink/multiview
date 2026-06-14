@@ -16,8 +16,8 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "A1000006"
-               BuildableName = "MultiView.app"
-               BlueprintName = "MultiView"
+               BuildableName = "Coverage.app"
+               BlueprintName = "Coverage"
                ReferencedContainer = "container:MultiView.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -45,8 +45,8 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "A1000006"
-            BuildableName = "MultiView.app"
-            BlueprintName = "MultiView"
+            BuildableName = "Coverage.app"
+            BlueprintName = "Coverage"
             ReferencedContainer = "container:MultiView.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
@@ -62,8 +62,8 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "A1000006"
-            BuildableName = "MultiView.app"
-            BlueprintName = "MultiView"
+            BuildableName = "Coverage.app"
+            BlueprintName = "Coverage"
             ReferencedContainer = "container:MultiView.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
