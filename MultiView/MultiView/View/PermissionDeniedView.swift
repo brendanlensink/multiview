@@ -14,7 +14,7 @@ struct PermissionDeniedView: View {
                 .font(.system(size: 48))
                 .foregroundStyle(.orange)
 
-            Text("MultiView Can't Run")
+            Text("Coverage Can't Run")
                 .font(.title2)
                 .fontWeight(.semibold)
 

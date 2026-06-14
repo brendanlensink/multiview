@@ -1,6 +1,6 @@
 //
 //  OnboardingStepView.swift
-//  MultiView
+//  Coverage
 //
 //  Created by Brendan Lensink on 2026-06-08.
 //
@@ -21,21 +21,21 @@ struct OnboardingStepView: View {
             OnboardingStepContent(
                 icon: "camera.fill",
                 title: "Camera Access",
-                message: "MultiView uses your camera to capture video from this device. Allow camera access so you can stream and record.",
+                message: "Coverage uses your camera to capture video from this device. Allow camera access so you can stream and record.",
                 buttonTitle: "Allow Camera Access"
             )
         case .microphone:
             OnboardingStepContent(
                 icon: "mic.fill",
                 title: "Microphone Access",
-                message: "MultiView uses your microphone to record audio on the director device. Allow microphone access so recordings include sound.",
+                message: "Coverage uses your microphone to record audio on the director device. Allow microphone access so recordings include sound.",
                 buttonTitle: "Allow Microphone Access"
             )
         case .localNetwork:
             OnboardingStepContent(
                 icon: "wifi",
                 title: "Local Network Access",
-                message: "MultiView connects devices over your local network for multi-angle capture. Allow local network access so directors and cameras can find each other.",
+                message: "Coverage connects devices over your local network for multi-angle capture. Allow local network access so directors and cameras can find each other.",
                 buttonTitle: "Allow Local Network Access"
             )
         }

@@ -24,13 +24,13 @@ struct ContentView: View {
                     }
                     .padding(.bottom, 12)
 
-                Text("MultiView")
+                Text("Coverage")
                     .font(.title)
                     .fontWeight(.medium)
                     .tracking(-0.3)
                     .padding(.bottom, 4)
 
-                Text("Multi-camera recording made simple")
+                Text("Multi-camera recording, covered")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
 
