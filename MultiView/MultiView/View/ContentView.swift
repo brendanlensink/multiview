@@ -66,6 +66,13 @@ struct ContentView: View {
                 }
 
                 Spacer()
+
+                NavigationLink("Settings") {
+                    SettingsView()
+                }
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .padding(.bottom, Theme.Padding.m)
             }
             .padding(.horizontal, Theme.Padding.xl)
             .navigationDestination(item: $selectedRole) { role in

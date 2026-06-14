@@ -7,7 +7,12 @@ final class VideoEncoder: @unchecked Sendable {
     private var compressionSession: VTCompressionSession?
     private var sessionWidth: Int32 = 0
     private var sessionHeight: Int32 = 0
+    private var currentBitrate: Int
     var onEncodedFrame: (@Sendable (FramePacket) -> Void)?
+
+    init(bitrate: Int = 2_000_000) {
+        self.currentBitrate = bitrate
+    }
 
     func encode(pixelBuffer: CVPixelBuffer, presentationTime: CMTime) {
         let width = Int32(CVPixelBufferGetWidth(pixelBuffer))
@@ -41,6 +46,7 @@ final class VideoEncoder: @unchecked Sendable {
     }
 
     func updateBitrate(_ bitrate: Int) {
+        currentBitrate = bitrate
         guard let session = compressionSession else { return }
         VTSessionSetProperty(session, key: kVTCompressionPropertyKey_AverageBitRate, value: bitrate as CFNumber)
         logger.info("Bitrate updated to \(bitrate)")
@@ -90,7 +96,7 @@ final class VideoEncoder: @unchecked Sendable {
 
         VTSessionSetProperty(session, key: kVTCompressionPropertyKey_RealTime, value: kCFBooleanTrue)
         VTSessionSetProperty(session, key: kVTCompressionPropertyKey_ProfileLevel, value: kVTProfileLevel_H264_Main_AutoLevel)
-        VTSessionSetProperty(session, key: kVTCompressionPropertyKey_AverageBitRate, value: 2_000_000 as CFNumber)
+        VTSessionSetProperty(session, key: kVTCompressionPropertyKey_AverageBitRate, value: currentBitrate as CFNumber)
         VTSessionSetProperty(session, key: kVTCompressionPropertyKey_MaxKeyFrameInterval, value: 60 as CFNumber)
         VTSessionSetProperty(session, key: kVTCompressionPropertyKey_AllowFrameReordering, value: kCFBooleanFalse)
 

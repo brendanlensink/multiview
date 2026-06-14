@@ -40,15 +40,17 @@ final class CaptureManager: NSObject {
     func applyQualityTier(_ tier: CaptureQualityTier) {
         guard isRunning else { return }
 
+        let userPreset = Self.userQualityPreset
+
         let preset: AVCaptureSession.Preset
         let bitrate: Int
         switch tier {
         case .full:
-            preset = .hd1280x720
-            bitrate = 2_000_000
+            preset = userPreset.sessionPreset
+            bitrate = userPreset.baseBitrate
         case .reduced:
-            preset = .hd1280x720
-            bitrate = 1_000_000
+            preset = userPreset.sessionPreset
+            bitrate = userPreset.baseBitrate / 2
         case .minimal:
             preset = .vga640x480
             bitrate = 500_000
@@ -64,12 +66,17 @@ final class CaptureManager: NSObject {
         encoderBridge.updateBitrate(bitrate)
     }
 
+    private static var userQualityPreset: CaptureQualityPreset {
+        let raw = UserDefaults.standard.string(forKey: "captureQualityPreset") ?? CaptureQualityPreset.medium.rawValue
+        return CaptureQualityPreset(rawValue: raw) ?? .medium
+    }
+
     func start() {
         guard !isRunning else { return }
 
         do {
             try configureCaptureSession()
-            encoderBridge.start()
+            encoderBridge.start(bitrate: Self.userQualityPreset.baseBitrate)
             captureSession.startRunning()
             isRunning = true
             UIDevice.current.beginGeneratingDeviceOrientationNotifications()
@@ -120,7 +127,7 @@ final class CaptureManager: NSObject {
             captureSession.addInput(newInput)
             cameraPosition = newPosition
             updateVideoRotation()
-            encoderBridge.resetEncoder()
+            encoderBridge.resetEncoder(bitrate: Self.userQualityPreset.baseBitrate)
             logger.info("Switched to \(newPosition == .front ? "front" : "back") camera")
         } catch {
             logger.error("Failed to switch camera: \(error.localizedDescription)")
@@ -131,7 +138,7 @@ final class CaptureManager: NSObject {
         captureSession.beginConfiguration()
         defer { captureSession.commitConfiguration() }
 
-        captureSession.sessionPreset = .hd1280x720
+        captureSession.sessionPreset = Self.userQualityPreset.sessionPreset
 
         guard let camera = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: cameraPosition) else {
             throw CaptureError.noCameraAvailable
@@ -227,8 +234,8 @@ private final class EncoderBridge: @unchecked Sendable {
     var onAudioSampleBuffer: (@Sendable (CMSampleBuffer) -> Void)?
     var onEncodedFrame: (@Sendable (FramePacket) -> Void)?
 
-    func start() {
-        encoder = VideoEncoder()
+    func start(bitrate: Int = 2_000_000) {
+        encoder = VideoEncoder(bitrate: bitrate)
         encoder?.onEncodedFrame = { [weak self] packet in
             self?.onEncodedFrame?(packet)
         }
@@ -247,9 +254,9 @@ private final class EncoderBridge: @unchecked Sendable {
         encoder?.updateBitrate(bitrate)
     }
 
-    func resetEncoder() {
+    func resetEncoder(bitrate: Int = 2_000_000) {
         encoder?.invalidate()
-        encoder = VideoEncoder()
+        encoder = VideoEncoder(bitrate: bitrate)
         encoder?.onEncodedFrame = { [weak self] packet in
             self?.onEncodedFrame?(packet)
         }
