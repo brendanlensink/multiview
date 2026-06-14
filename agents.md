@@ -14,14 +14,14 @@ All source lives under `MultiView/MultiView/`:
 
 | File | Role |
 |------|------|
-| `ContentView.swift` | Root view, role selection (Director vs Camera) |
+| `ContentView.swift` | Root view, role selection (Director vs Camera), links to Settings |
 | `DirectorView.swift` | Director UI — displays interactive grid of all camera feeds with drag-to-move and pinch-to-resize |
 | `FeedLayoutManager.swift` | Manages feed positions/sizes, handles overlap resolution when feeds are dragged or resized |
 | `CameraView.swift` | Camera participant UI — streams video to director |
 | `CameraPreviewView.swift` | Local camera preview |
 | `SampleBufferVideoView.swift` | Wraps `AVSampleBufferDisplayLayer` for rendering decoded frames |
 | `ConnectivityManager.swift` | MultipeerConnectivity session, advertising, browsing, send/receive |
-| `CaptureManager.swift` | `AVCaptureSession` setup, raw `CMSampleBuffer` output |
+| `CaptureManager.swift` | `AVCaptureSession` setup, raw `CMSampleBuffer` output, applies user quality preset |
 | `VideoEncoder.swift` | H.264 hardware encoding via `VTCompressionSession` |
 | `VideoDecoder.swift` | Decodes H.264 NALUs back to `CMSampleBuffer` |
 | `FrameSender.swift` | Queues and rate-limits encoded frames, drops non-keyframes on congestion |
@@ -35,6 +35,8 @@ All source lives under `MultiView/MultiView/`:
 | `RecordingStore.swift` | Manages recording temp directory — lists completed sessions, cleans up orphaned recordings |
 | `PhotosExporter.swift` | Exports recording sessions to the Photos library via `PHPhotoLibrary`, cleans up temp files on success |
 | `GridCompositor.swift` | Composites multiple angle recordings into a single split-screen video via `AVMutableComposition` + `AVVideoComposition` |
+| `SettingsView.swift` | Settings page — capture quality presets, privacy policy link, version/build info |
+| `CaptureQualityPreset.swift` | User-selectable capture quality levels (High/Medium/Low) with resolution and bitrate mappings |
 | `ExportOptionsSheet.swift` | Post-recording export UI — choose between separate files or grid composite export |
 | `TestPatternGenerator.swift` | Generates static test pattern `CVPixelBuffer`s with colored bars and labels (simulator only) |
 | `SimulatorSession.swift` | Orchestrates mock video feeds and fake peers for simulator testing (simulator only) |
@@ -43,10 +45,10 @@ All source lives under `MultiView/MultiView/`:
 
 **Camera device (sender):**
 ```
-AVCaptureSession (720p)
+AVCaptureSession (resolution from CaptureQualityPreset, default 720p)
   → AVCaptureVideoDataOutput
     → CaptureManager.onRawSampleBuffer
-      → VideoEncoder (VTCompressionSession, H.264 Main, 2 Mbps)
+      → VideoEncoder (VTCompressionSession, H.264 Main, bitrate from CaptureQualityPreset)
         → FrameSender (rate-limited, drops non-keyframes on congestion)
           → ConnectivityManager.sendFrame()
             → MCSession.send()
