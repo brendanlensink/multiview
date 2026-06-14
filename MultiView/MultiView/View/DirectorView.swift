@@ -26,6 +26,11 @@ struct DirectorView: View {
     var body: some View {
         directorContent
         .navigationTitle("Director")
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                cameraListButton
+            }
+        }
         .sheet(item: $completedSession) { session in
             ExportOptionsSheet(session: session) {
                 completedSession = nil
@@ -138,12 +143,9 @@ struct DirectorView: View {
 
     private var recordingOverlay: some View {
         VStack {
-            HStack(alignment: .top) {
-                ThrottleIndicator(tier: conditionManager.qualityTier)
-                    .animation(.easeInOut, value: conditionManager.qualityTier)
-                Spacer()
-                cameraListButton
-            }
+            ThrottleIndicator(tier: conditionManager.qualityTier)
+                .animation(.easeInOut, value: conditionManager.qualityTier)
+                .frame(maxWidth: .infinity, alignment: .leading)
             Spacer()
             VStack(spacing: 12) {
                 if recordingManager.isRecording, let startDate = recordingStartDate {
@@ -162,13 +164,7 @@ struct DirectorView: View {
             showingCameraList = true
         } label: {
             Image(systemName: "video.fill")
-                .font(.system(size: 14))
-                .foregroundStyle(.white)
-                .padding(8)
-                .background(.black.opacity(0.5), in: Circle())
         }
-        .padding(.top, 8)
-        .padding(.trailing, 16)
         .popover(isPresented: $showingCameraList) {
             CameraListPopover(layoutManager: layoutManager, allFeedIDs: allFeedIDs)
         }
@@ -335,11 +331,15 @@ private struct InteractiveFeedCell: View {
                 isDisconnected: isDisconnected
             )
             .frame(width: frame.size.width, height: frame.size.height)
-            .overlay(alignment: .topTrailing) {
+            .overlay {
                 if isEditing {
                     RoundedRectangle(cornerRadius: 4)
                         .strokeBorder(.red, lineWidth: 3)
-
+                        .allowsHitTesting(false)
+                }
+            }
+            .overlay(alignment: .topTrailing) {
+                if isEditing {
                     Button {
                         withAnimation(.easeInOut(duration: 0.3)) {
                             layoutManager.hiddenFeeds.insert(feedID)
