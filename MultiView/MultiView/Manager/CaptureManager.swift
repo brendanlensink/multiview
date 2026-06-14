@@ -15,6 +15,11 @@ final class CaptureManager: NSObject {
 
     private(set) var isRunning = false
     private(set) var error: String?
+    private(set) var cameraPosition: AVCaptureDevice.Position = .back
+
+    var canSwitchCamera: Bool {
+        AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: cameraPosition == .back ? .front : .back) != nil
+    }
 
     var onRawSampleBuffer: (@Sendable (CMSampleBuffer) -> Void)? {
         get { encoderBridge.onRawSampleBuffer }
@@ -91,13 +96,44 @@ final class CaptureManager: NSObject {
         logger.info("Capture session stopped")
     }
 
+    func switchCamera() {
+        guard isRunning else { return }
+        let newPosition: AVCaptureDevice.Position = cameraPosition == .back ? .front : .back
+        guard let newCamera = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: newPosition) else {
+            logger.warning("No camera available for position \(String(describing: newPosition))")
+            return
+        }
+
+        captureSession.beginConfiguration()
+        defer { captureSession.commitConfiguration() }
+
+        if let currentInput = captureSession.inputs.first(where: { ($0 as? AVCaptureDeviceInput)?.device.hasMediaType(.video) == true }) {
+            captureSession.removeInput(currentInput)
+        }
+
+        do {
+            let newInput = try AVCaptureDeviceInput(device: newCamera)
+            guard captureSession.canAddInput(newInput) else {
+                logger.error("Cannot add video input for \(String(describing: newPosition)) camera")
+                return
+            }
+            captureSession.addInput(newInput)
+            cameraPosition = newPosition
+            updateVideoRotation()
+            encoderBridge.resetEncoder()
+            logger.info("Switched to \(newPosition == .front ? "front" : "back") camera")
+        } catch {
+            logger.error("Failed to switch camera: \(error.localizedDescription)")
+        }
+    }
+
     private func configureCaptureSession() throws {
         captureSession.beginConfiguration()
         defer { captureSession.commitConfiguration() }
 
         captureSession.sessionPreset = .hd1280x720
 
-        guard let camera = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back) else {
+        guard let camera = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: cameraPosition) else {
             throw CaptureError.noCameraAvailable
         }
 
@@ -210,6 +246,14 @@ private final class EncoderBridge: @unchecked Sendable {
     func updateBitrate(_ bitrate: Int) {
         encoder?.updateBitrate(bitrate)
     }
+
+    func resetEncoder() {
+        encoder?.invalidate()
+        encoder = VideoEncoder()
+        encoder?.onEncodedFrame = { [weak self] packet in
+            self?.onEncodedFrame?(packet)
+        }
+    }
 }
 
 // MARK: - Errors
@@ -222,7 +266,7 @@ enum CaptureError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .noCameraAvailable: "No back camera available"
+        case .noCameraAvailable: "No camera available"
         case .noMicrophoneAvailable: "No microphone available"
         case .cannotAddInput: "Cannot add input to session"
         case .cannotAddOutput: "Cannot add output to session"

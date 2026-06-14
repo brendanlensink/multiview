@@ -166,7 +166,12 @@ struct DirectorView: View {
             Image(systemName: "video.fill")
         }
         .popover(isPresented: $showingCameraList) {
-            CameraListPopover(layoutManager: layoutManager, allFeedIDs: allFeedIDs)
+            CameraListPopover(
+                layoutManager: layoutManager,
+                allFeedIDs: allFeedIDs,
+                canSwitchDirectorCamera: captureManager.canSwitchCamera,
+                onSwitchDirectorCamera: { captureManager.switchCamera() }
+            )
         }
     }
 
@@ -497,6 +502,8 @@ private struct PeerVideoCell: View {
 private struct CameraListPopover: View {
     let layoutManager: FeedLayoutManager
     let allFeedIDs: [FeedID]
+    var canSwitchDirectorCamera = false
+    var onSwitchDirectorCamera: (() -> Void)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -508,30 +515,42 @@ private struct CameraListPopover: View {
 
             ForEach(Array(allFeedIDs.enumerated()), id: \.element) { _, feedID in
                 let isHidden = layoutManager.hiddenFeeds.contains(feedID)
-                Button {
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        if isHidden {
-                            layoutManager.hiddenFeeds.remove(feedID)
-                        } else {
-                            layoutManager.hiddenFeeds.insert(feedID)
+                HStack {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            if isHidden {
+                                layoutManager.hiddenFeeds.remove(feedID)
+                            } else {
+                                layoutManager.hiddenFeeds.insert(feedID)
+                            }
                         }
+                    } label: {
+                        HStack {
+                            Image(systemName: feedID == .director ? "video.fill" : "camera.fill")
+                                .foregroundStyle(.secondary)
+                                .frame(width: 20)
+                            Text(feedID.displayName)
+                                .foregroundStyle(isHidden ? .secondary : .primary)
+                            Spacer()
+                            Image(systemName: isHidden ? "eye.slash" : "eye")
+                                .foregroundColor(isHidden ? .secondary : .blue)
+                        }
+                        .contentShape(Rectangle())
                     }
-                } label: {
-                    HStack {
-                        Image(systemName: feedID == .director ? "video.fill" : "camera.fill")
-                            .foregroundStyle(.secondary)
-                            .frame(width: 20)
-                        Text(feedID.displayName)
-                            .foregroundStyle(isHidden ? .secondary : .primary)
-                        Spacer()
-                        Image(systemName: isHidden ? "eye.slash" : "eye")
-                            .foregroundColor(isHidden ? .secondary : .blue)
+                    .buttonStyle(.plain)
+
+                    if feedID == .director, canSwitchDirectorCamera {
+                        Button {
+                            onSwitchDirectorCamera?()
+                        } label: {
+                            Image(systemName: "arrow.triangle.2.circlepath.camera")
+                                .foregroundStyle(.blue)
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
             }
         }
         .padding(.bottom, 12)
