@@ -9,6 +9,7 @@ final class VideoEncoder: @unchecked Sendable {
     private var sessionHeight: Int32 = 0
     private var currentBitrate: Int
     var onEncodedFrame: (@Sendable (FramePacket) -> Void)?
+    var onEncodedSampleBuffer: (@Sendable (CMSampleBuffer) -> Void)?
 
     init(bitrate: Int = 2_000_000) {
         self.currentBitrate = bitrate
@@ -105,6 +106,8 @@ final class VideoEncoder: @unchecked Sendable {
     }
 
     private func handleEncodedFrame(_ sampleBuffer: CMSampleBuffer) {
+        onEncodedSampleBuffer?(sampleBuffer)
+
         guard let dataBuffer = CMSampleBufferGetDataBuffer(sampleBuffer) else { return }
 
         var totalLength: Int = 0

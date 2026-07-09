@@ -66,8 +66,10 @@ struct DirectorView: View {
             simulatorSession = session
             session.start()
             #else
-            captureManager.onRawSampleBuffer = { [localDisplayLayer, recordingManager] sampleBuffer in
+            captureManager.onRawSampleBuffer = { [localDisplayLayer] sampleBuffer in
                 localDisplayLayer.enqueue(sampleBuffer)
+            }
+            captureManager.onEncodedSampleBuffer = { [recordingManager] sampleBuffer in
                 recordingManager.appendLocalSample(sampleBuffer)
             }
             captureManager.onAudioSampleBuffer = { [recordingManager] sampleBuffer in
@@ -96,6 +98,7 @@ struct DirectorView: View {
             }
 
             captureManager.onRawSampleBuffer = nil
+            captureManager.onEncodedSampleBuffer = nil
             captureManager.onAudioSampleBuffer = nil
             captureManager.stop()
             conditionManager.stopMonitoring()

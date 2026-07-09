@@ -37,6 +37,10 @@ final class CaptureManager: NSObject {
         didSet { encoderBridge.onEncodedFrame = onEncodedFrame }
     }
 
+    var onEncodedSampleBuffer: (@Sendable (CMSampleBuffer) -> Void)? {
+        didSet { encoderBridge.onEncodedSampleBuffer = onEncodedSampleBuffer }
+    }
+
     var previewSource: AVCaptureSession { captureSession }
 
     func applyQualityTier(_ tier: CaptureQualityTier) {
@@ -252,11 +256,15 @@ private final class EncoderBridge: @unchecked Sendable {
     var onRawSampleBuffer: (@Sendable (CMSampleBuffer) -> Void)?
     var onAudioSampleBuffer: (@Sendable (CMSampleBuffer) -> Void)?
     var onEncodedFrame: (@Sendable (FramePacket) -> Void)?
+    var onEncodedSampleBuffer: (@Sendable (CMSampleBuffer) -> Void)?
 
     func start(bitrate: Int = 2_000_000) {
         encoder = VideoEncoder(bitrate: bitrate)
         encoder?.onEncodedFrame = { [weak self] packet in
             self?.onEncodedFrame?(packet)
+        }
+        encoder?.onEncodedSampleBuffer = { [weak self] sampleBuffer in
+            self?.onEncodedSampleBuffer?(sampleBuffer)
         }
     }
 
@@ -278,6 +286,9 @@ private final class EncoderBridge: @unchecked Sendable {
         encoder = VideoEncoder(bitrate: bitrate)
         encoder?.onEncodedFrame = { [weak self] packet in
             self?.onEncodedFrame?(packet)
+        }
+        encoder?.onEncodedSampleBuffer = { [weak self] sampleBuffer in
+            self?.onEncodedSampleBuffer?(sampleBuffer)
         }
     }
 }

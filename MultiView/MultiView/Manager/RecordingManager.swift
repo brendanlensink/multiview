@@ -55,7 +55,7 @@ final class RecordingManager {
             let localRecorder = try StreamRecorder(
                 streamName: localPeerName,
                 outputURL: localURL,
-                isPassthrough: false,
+                isPassthrough: true,
                 includeAudio: true,
                 sessionStartTime: sessionStartTime
             )

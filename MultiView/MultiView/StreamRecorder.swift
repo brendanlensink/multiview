@@ -75,6 +75,9 @@ final class StreamRecorder: @unchecked Sendable {
 
     private func _appendVideo(_ sampleBuffer: CMSampleBuffer) {
         if videoInput == nil {
+            if isPassthrough && !Self.isKeyFrame(sampleBuffer) {
+                return
+            }
             setupVideoInput(from: sampleBuffer)
         }
 
@@ -169,5 +172,10 @@ final class StreamRecorder: @unchecked Sendable {
 
     private func cleanupFile() {
         try? FileManager.default.removeItem(at: outputURL)
+    }
+
+    private static func isKeyFrame(_ sampleBuffer: CMSampleBuffer) -> Bool {
+        let attachments = CMSampleBufferGetSampleAttachmentsArray(sampleBuffer, createIfNecessary: false) as? [[CFString: Any]]
+        return !(attachments?.first?[kCMSampleAttachmentKey_NotSync] as? Bool ?? false)
     }
 }
