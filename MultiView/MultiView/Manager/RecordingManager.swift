@@ -97,12 +97,19 @@ final class RecordingManager {
         isRecording = false
         lostStreamCount = 0
 
-        let app = UIApplication.shared
-        backgroundTaskID = app.beginBackgroundTask { [weak self] in
+        var stopTaskID: UIBackgroundTaskIdentifier = .invalid
+        stopTaskID = UIApplication.shared.beginBackgroundTask { [weak self] in
             self?.logger.warning("Background task expired before stop-recording finalization completed")
-            self?.endBackgroundTask()
+            guard stopTaskID != .invalid else { return }
+            UIApplication.shared.endBackgroundTask(stopTaskID)
+            stopTaskID = .invalid
         }
-        defer { endBackgroundTask() }
+        defer {
+            if stopTaskID != .invalid {
+                UIApplication.shared.endBackgroundTask(stopTaskID)
+                stopTaskID = .invalid
+            }
+        }
 
         let recorders = activeRecorders.removeAll()
 
