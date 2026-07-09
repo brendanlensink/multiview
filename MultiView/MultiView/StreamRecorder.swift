@@ -161,6 +161,7 @@ final class StreamRecorder: @unchecked Sendable {
 
     private func startSessionIfNeeded() {
         guard !started else { return }
+        guard videoInput != nil, !includeAudio || audioInput != nil else { return }
         assetWriter.startWriting()
         assetWriter.startSession(atSourceTime: sessionStartTime)
         started = true
