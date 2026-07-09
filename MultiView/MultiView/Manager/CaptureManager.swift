@@ -12,6 +12,7 @@ final class CaptureManager: NSObject {
     private let audioOutput = AVCaptureAudioDataOutput()
     private let outputQueue = DispatchQueue(label: "com.multiview.capture-output")
     private let encodeQueue = DispatchQueue(label: "com.multiview.video-encode")
+    private let sessionQueue = DispatchQueue(label: "com.multiview.capture-session")
     private nonisolated let encoderBridge = EncoderBridge()
 
     private(set) var isRunning = false
@@ -78,7 +79,6 @@ final class CaptureManager: NSObject {
         do {
             try configureCaptureSession()
             encoderBridge.start(bitrate: Self.userQualityPreset.baseBitrate)
-            captureSession.startRunning()
             isRunning = true
             UIDevice.current.beginGeneratingDeviceOrientationNotifications()
             NotificationCenter.default.addObserver(
@@ -88,6 +88,9 @@ final class CaptureManager: NSObject {
                 object: nil
             )
             updateVideoRotation()
+            sessionQueue.async { [captureSession] in
+                captureSession.startRunning()
+            }
             logger.info("Capture session started")
         } catch {
             self.error = error.localizedDescription
@@ -98,9 +101,11 @@ final class CaptureManager: NSObject {
     func stop() {
         NotificationCenter.default.removeObserver(self, name: UIDevice.orientationDidChangeNotification, object: nil)
         UIDevice.current.endGeneratingDeviceOrientationNotifications()
-        captureSession.stopRunning()
         encoderBridge.stop()
         isRunning = false
+        sessionQueue.async { [captureSession] in
+            captureSession.stopRunning()
+        }
         logger.info("Capture session stopped")
     }
 
