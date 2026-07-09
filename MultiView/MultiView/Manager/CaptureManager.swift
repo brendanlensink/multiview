@@ -11,6 +11,7 @@ final class CaptureManager: NSObject {
     private let videoOutput = AVCaptureVideoDataOutput()
     private let audioOutput = AVCaptureAudioDataOutput()
     private let outputQueue = DispatchQueue(label: "com.multiview.capture-output")
+    private let encodeQueue = DispatchQueue(label: "com.multiview.video-encode")
     private nonisolated let encoderBridge = EncoderBridge()
 
     private(set) var isRunning = false
@@ -218,7 +219,9 @@ extension CaptureManager: AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptur
         encoderBridge.onRawSampleBuffer?(sampleBuffer)
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
         let presentationTime = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
-        encoderBridge.encode(pixelBuffer: pixelBuffer, presentationTime: presentationTime)
+        encodeQueue.async { [encoderBridge] in
+            encoderBridge.encode(pixelBuffer: pixelBuffer, presentationTime: presentationTime)
+        }
     }
 
     nonisolated func captureOutput(_ output: AVCaptureOutput, didDrop sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
