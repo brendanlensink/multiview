@@ -7,9 +7,9 @@ import os
 final class CaptureManager: NSObject {
     private nonisolated let logger = Logger(subsystem: "com.multiview", category: "Capture")
 
-    private let captureSession = AVCaptureSession()
-    private let videoOutput = AVCaptureVideoDataOutput()
-    private let audioOutput = AVCaptureAudioDataOutput()
+    private nonisolated(unsafe) let captureSession = AVCaptureSession()
+    private nonisolated(unsafe) let videoOutput = AVCaptureVideoDataOutput()
+    private nonisolated(unsafe) let audioOutput = AVCaptureAudioDataOutput()
     private let outputQueue = DispatchQueue(label: "com.multiview.capture-output")
     private let encodeQueue = DispatchQueue(label: "com.multiview.video-encode")
     private let sessionQueue = DispatchQueue(label: "com.multiview.capture-session")
@@ -68,34 +68,45 @@ final class CaptureManager: NSObject {
         encoderBridge.updateBitrate(bitrate)
     }
 
-    private static var userQualityPreset: CaptureQualityPreset {
+    private nonisolated static var userQualityPreset: CaptureQualityPreset {
         let raw = UserDefaults.standard.string(forKey: "captureQualityPreset") ?? CaptureQualityPreset.medium.rawValue
         return CaptureQualityPreset(rawValue: raw) ?? .medium
     }
 
     func start() {
         guard !isRunning else { return }
+        isRunning = true
 
-        do {
-            try configureCaptureSession()
-            encoderBridge.start(bitrate: Self.userQualityPreset.baseBitrate)
-            isRunning = true
-            UIDevice.current.beginGeneratingDeviceOrientationNotifications()
-            NotificationCenter.default.addObserver(
-                self,
-                selector: #selector(orientationDidChange),
-                name: UIDevice.orientationDidChangeNotification,
-                object: nil
-            )
-            updateVideoRotation()
-            sessionQueue.async { [captureSession] in
-                captureSession.startRunning()
+        let position = cameraPosition
+        sessionQueue.async { [weak self] in
+            guard let self else { return }
+            do {
+                try self.configureCaptureSession(position: position)
+                self.captureSession.startRunning()
+                Task { @MainActor [weak self] in
+                    self?.finishStarting()
+                }
+            } catch {
+                Task { @MainActor [weak self] in
+                    self?.isRunning = false
+                    self?.error = error.localizedDescription
+                    self?.logger.error("Failed to start capture session: \(error.localizedDescription)")
+                }
             }
-            logger.info("Capture session started")
-        } catch {
-            self.error = error.localizedDescription
-            logger.error("Failed to start capture session: \(error.localizedDescription)")
         }
+    }
+
+    private func finishStarting() {
+        encoderBridge.start(bitrate: Self.userQualityPreset.baseBitrate)
+        UIDevice.current.beginGeneratingDeviceOrientationNotifications()
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(orientationDidChange),
+            name: UIDevice.orientationDidChangeNotification,
+            object: nil
+        )
+        updateVideoRotation()
+        logger.info("Capture session started")
     }
 
     func stop() {
@@ -140,13 +151,13 @@ final class CaptureManager: NSObject {
         }
     }
 
-    private func configureCaptureSession() throws {
+    private nonisolated func configureCaptureSession(position: AVCaptureDevice.Position) throws {
         captureSession.beginConfiguration()
         defer { captureSession.commitConfiguration() }
 
         captureSession.sessionPreset = Self.userQualityPreset.sessionPreset
 
-        guard let camera = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: cameraPosition) else {
+        guard let camera = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: position) else {
             throw CaptureError.noCameraAvailable
         }
 
@@ -202,7 +213,7 @@ final class CaptureManager: NSObject {
         logger.info("Video rotation updated to \(angle)°")
     }
 
-    private static func rotationAngle(for orientation: UIDeviceOrientation) -> CGFloat {
+    private nonisolated static func rotationAngle(for orientation: UIDeviceOrientation) -> CGFloat {
         switch orientation {
         case .landscapeLeft: return 0
         case .landscapeRight: return 180
