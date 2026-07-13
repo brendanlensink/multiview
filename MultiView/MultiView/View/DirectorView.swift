@@ -146,18 +146,23 @@ struct DirectorView: View {
 
     private var recordingOverlay: some View {
         VStack {
-            ThrottleIndicator(tier: conditionManager.qualityTier)
-                .animation(.easeInOut, value: conditionManager.qualityTier)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            Spacer()
-            VStack(spacing: 12) {
-                if recordingManager.isRecording, let startDate = recordingStartDate {
-                    RecordingIndicator(startDate: startDate, lostStreamCount: recordingManager.lostStreamCount)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
+            HStack {
+                VStack(alignment: .leading, spacing: Theme.Padding.s) {
+                    if recordingManager.isRecording, let startDate = recordingStartDate {
+                        RecordingIndicator(startDate: startDate, lostStreamCount: recordingManager.lostStreamCount)
+                            .transition(.move(edge: .top).combined(with: .opacity))
+                    }
+                    ThrottleIndicator(tier: conditionManager.qualityTier)
+                        .animation(.easeInOut, value: conditionManager.qualityTier)
                 }
-                recordButton
+                Spacer()
             }
-            .padding(.bottom, 20)
+            .padding(.horizontal, Theme.Padding.m)
+            .padding(.top, Theme.Padding.s)
+
+            Spacer()
+            recordButton
+                .padding(.bottom, 20)
         }
         .animation(.easeInOut(duration: 0.25), value: recordingManager.isRecording)
     }
@@ -166,7 +171,11 @@ struct DirectorView: View {
         Button {
             showingCameraList = true
         } label: {
-            Image(systemName: "video.fill")
+            Image(systemName: "square")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 34, height: 34)
+                .background(.black.opacity(0.6), in: RoundedRectangle(cornerRadius: 10))
         }
         .popover(isPresented: $showingCameraList) {
             CameraListPopover(
@@ -441,7 +450,6 @@ private struct RecordingIndicator: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
         .background(.black.opacity(0.6), in: Capsule())
-        .padding(.top, 8)
         .onAppear {
             withAnimation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true)) {
                 dotVisible = false
@@ -459,7 +467,7 @@ private struct PeerVideoCell: View {
     var isDisconnected = false
 
     var body: some View {
-        ZStack(alignment: .bottomLeading) {
+        ZStack {
             if let displayLayer {
                 SampleBufferVideoView(layer: displayLayer)
             } else {
@@ -481,14 +489,31 @@ private struct PeerVideoCell: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
 
-            Text(peerName)
-                .font(.caption)
-                .fontWeight(.medium)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(.black.opacity(0.6), in: RoundedRectangle(cornerRadius: 6))
-                .foregroundStyle(.white)
+            if isLocal {
+                Text("\(peerName.uppercased()) — YOU")
+                    .font(.caption)
+                    .fontDesign(.monospaced)
+                    .fontWeight(.medium)
+                    .tracking(1)
+                    .foregroundStyle(.secondary)
+            } else {
+                VStack {
+                    HStack {
+                        Text(peerName.uppercased())
+                            .font(.caption)
+                            .fontDesign(.monospaced)
+                            .fontWeight(.medium)
+                            .tracking(1)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(.black.opacity(0.6), in: RoundedRectangle(cornerRadius: 6))
+                            .foregroundStyle(.white)
+                        Spacer()
+                    }
+                    Spacer()
+                }
                 .padding(8)
+            }
         }
         .clipped()
         .overlay {
