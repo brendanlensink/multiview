@@ -98,24 +98,32 @@ struct CameraView: View {
             .padding(.vertical, 10)
             .background(.ultraThinMaterial, in: Capsule())
         case .disconnected:
-            VStack(spacing: 8) {
-                Label("Disconnected", systemImage: "wifi.slash")
-                    .font(.subheadline)
-                    .fontWeight(.medium)
+            VStack(spacing: Theme.Padding.s) {
+                Text("Disconnected")
+                    .font(.title3)
+                    .fontWeight(.bold)
+                    .foregroundStyle(.white)
 
                 Text("Reconnecting automatically…")
-                    .font(.caption)
+                    .font(.subheadline)
                     .foregroundStyle(.secondary)
 
-                Button("Reconnect Now") {
+                Button {
                     connectivity.startBrowsing()
+                } label: {
+                    Text("Reconnect Now")
+                        .font(.subheadline)
+                        .fontWeight(.bold)
+                        .foregroundStyle(.black)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, Theme.Padding.s)
+                        .background(Color(red: 1, green: 90 / 255, blue: 54 / 255))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
-                .font(.subheadline)
-                .buttonStyle(.borderedProminent)
+                .padding(.top, Theme.Padding.xs)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+            .padding(Theme.Padding.m)
+            .background(Color.black.opacity(0.8), in: RoundedRectangle(cornerRadius: 20))
         default:
             VStack(alignment: .leading, spacing: 0) {
                 Text("NEARBY DIRECTORS")
