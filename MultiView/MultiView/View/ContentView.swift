@@ -15,23 +15,26 @@ struct ContentView: View {
                 Spacer()
 
                 RoundedRectangle(cornerRadius: 14)
-                    .fill(Color.Theme.primary)
+                    .stroke(Color.secondary.opacity(0.4), lineWidth: 1)
                     .frame(width: 56, height: 56)
                     .overlay {
-                        Image(systemName: "rectangle.grid.2x2.fill")
-                            .font(.title2)
-                            .foregroundStyle(.white)
+                        Image(systemName: "square.grid.2x2.fill")
+                            .font(.title3)
+                            .foregroundStyle(.primary)
                     }
-                    .padding(.bottom, 12)
+                    .padding(.bottom, 16)
 
-                Text("Coverage")
-                    .font(.title)
-                    .fontWeight(.medium)
-                    .tracking(-0.3)
-                    .padding(.bottom, 4)
+                Text("COVERAGE")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .fontDesign(.monospaced)
+                    .tracking(2)
+                    .padding(.bottom, 6)
 
-                Text("Multi-camera recording, covered")
-                    .font(.subheadline)
+                Text("MULTI-CAM · SYNCED · LOCAL")
+                    .font(.caption2)
+                    .fontDesign(.monospaced)
+                    .tracking(1.2)
                     .foregroundStyle(.secondary)
 
                 Spacer()
@@ -40,27 +43,23 @@ struct ContentView: View {
 
                 Text("CHOOSE YOUR ROLE")
                     .font(.caption)
-                    .fontWeight(.medium)
+                    .fontDesign(.monospaced)
                     .foregroundStyle(.secondary)
-                    .tracking(0.8)
+                    .tracking(1)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.bottom, 10)
+                    .padding(.bottom, 16)
 
-                RoleCard(
+                RoleRow(
                     title: "Director",
-                    subtitle: "View and record all camera feeds",
-                    systemImage: "tv",
-                    iconColor: .blue
+                    subtitle: "View and record all camera feeds"
                 ) {
                     selectedRole = .director
                 }
-                .padding(.bottom, 10)
+                .padding(.bottom, 20)
 
-                RoleCard(
+                RoleRow(
                     title: "Camera",
-                    subtitle: "Stream your feed to a director",
-                    systemImage: "video.fill",
-                    iconColor: .green
+                    subtitle: "Stream your feed to a director"
                 ) {
                     selectedRole = .camera
                 }
@@ -87,29 +86,23 @@ struct ContentView: View {
     }
 }
 
-private struct RoleCard: View {
+private struct RoleRow: View {
     let title: String
     let subtitle: String
-    let systemImage: String
-    let iconColor: Color
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
             HStack(spacing: 14) {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(iconColor.opacity(0.12))
-                    .frame(width: 44, height: 44)
-                    .overlay {
-                        Image(systemName: systemImage)
-                            .font(.title3)
-                            .foregroundStyle(iconColor)
-                    }
+                Circle()
+                    .stroke(Color.secondary.opacity(0.5), lineWidth: 1.5)
+                    .frame(width: 20, height: 20)
+                    .accessibilityHidden(true)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
                         .font(.body)
-                        .fontWeight(.medium)
+                        .fontWeight(.semibold)
 
                     Text(subtitle)
                         .font(.caption)
@@ -121,10 +114,8 @@ private struct RoleCard: View {
                 Image(systemName: "chevron.right")
                     .font(.caption)
                     .foregroundStyle(.tertiary)
+                    .accessibilityHidden(true)
             }
-            .padding(16)
-            .background(Color(.secondarySystemBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
         }
         .buttonStyle(.plain)
     }
