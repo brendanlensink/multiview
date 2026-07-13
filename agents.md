@@ -10,9 +10,23 @@ GitHub repo: `brendanlensink/multiview`
 
 - **Default reviewer if ticket has no assignee:** `brendanlensink`
 
+## Platform Trees
+
+| Label | Path |
+|---|---|
+| `ios` | `MultiView/**` |
+
 ## Screenshots
 
 - **Directory:** `docs/pr-screenshots`
+
+### Capture
+
+- **Build scheme:** `MultiView`
+- **UI file globs:** `MultiView/MultiView/View/**/*.swift`
+- **Simulator preference:** none — defaults to a recent available iPhone
+- **Build prerequisites:** none
+- **Deep-link navigation:** not configured — no custom URL scheme is registered in `Info.plist`, so only the launch screen and screens reachable via `idb ui tap` are captured; the rest are reported as skipped
 
 ## Platform & Build
 
