@@ -5,7 +5,6 @@
 //  Created by Brendan Lensink on 2026-06-08.
 //
 
-import NiceComponents
 import SwiftUI
 
 struct OnboardingStepView: View {
@@ -19,14 +18,14 @@ struct OnboardingStepView: View {
         switch step {
         case .camera:
             OnboardingStepContent(
-                icon: "camera.fill",
+                icon: "camera",
                 title: "Camera Access",
                 message: "Coverage uses your camera to capture video from this device. Allow camera access so you can stream and record.",
                 buttonTitle: "Allow Camera Access"
             )
         case .microphone:
             OnboardingStepContent(
-                icon: "mic.fill",
+                icon: "mic",
                 title: "Microphone Access",
                 message: "Coverage uses your microphone to record audio on the director device. Allow microphone access so recordings include sound.",
                 buttonTitle: "Allow Microphone Access"
@@ -42,37 +41,72 @@ struct OnboardingStepView: View {
     }
 
     var body: some View {
-        VStack(spacing: 24) {
+        VStack(spacing: 0) {
+            Spacer(minLength: Theme.Padding.xl)
+
+            Text("STEP \(step.rawValue + 1) OF \(OnboardingStep.allCases.count)")
+                .font(.caption)
+                .fontDesign(.monospaced)
+                .foregroundStyle(.secondary)
+                .tracking(1)
+
             Spacer()
 
-            NiceText(content.title, style: .screenTitle)
-                .multilineTextAlignment(.center)
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Color.secondary.opacity(0.4), lineWidth: 1)
+                .frame(width: 72, height: 72)
+                .overlay {
+                    Image(systemName: content.icon)
+                        .font(.title2)
+                        .foregroundStyle(.primary)
+                }
 
-            Group {
-                NiceImage(systemIcon: content.icon, width: 300, height: 150, tintColor: Color.Theme.primary, contentMode: .fit)
-            }.frame(height: 350)
+            Spacer()
 
+            VStack(spacing: 12) {
+                Text(content.title)
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .multilineTextAlignment(.center)
 
-            NiceText(content.message, style: .body)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, Theme.Padding.m)
-
-            NiceButton(content.buttonTitle, style: .primary) {
-                Task { await requestPermission() }
+                Text(content.message)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, Theme.Padding.l)
             }
 
+            Spacer()
+            Spacer()
+
+            Button {
+                Task { await requestPermission() }
+            } label: {
+                Text(content.buttonTitle)
+                    .font(.body)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.black)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, Theme.Padding.m)
+                    .background(Color.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+            }
+            .disabled(isRequesting)
+            .padding(.bottom, Theme.Padding.m)
+
             onboardingProgress
+
+            Spacer(minLength: Theme.Padding.l)
         }
-        .padding(.horizontal, 32)
-        .padding(.bottom, 32)
+        .padding(.horizontal, Theme.Padding.xl)
     }
 
     private var onboardingProgress: some View {
-        HStack(spacing: Theme.Padding.m) {
+        HStack(spacing: Theme.Padding.s) {
             ForEach(OnboardingStep.allCases, id: \.rawValue) { onboardingStep in
                 Circle()
-                    .fill(onboardingStep.rawValue <= step.rawValue ? Color.Theme.primary : Color.Theme.primary.opacity(0.3))
-                    .frame(width: 8, height: 8)
+                    .fill(onboardingStep == step ? Color.primary : Color.secondary.opacity(0.4))
+                    .frame(width: 6, height: 6)
             }
         }
     }
