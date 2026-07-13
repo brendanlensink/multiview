@@ -10,6 +10,10 @@ GitHub repo: `brendanlensink/multiview`
 
 - **Default reviewer if ticket has no assignee:** `brendanlensink`
 
+## Screenshots
+
+- **Directory:** `docs/pr-screenshots`
+
 ## Platform & Build
 
 - **iOS only** (iPhone/iPad), SwiftUI frontend, no macOS target
