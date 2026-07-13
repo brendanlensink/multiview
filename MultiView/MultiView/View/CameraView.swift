@@ -24,6 +24,15 @@ struct CameraView: View {
                 .ignoresSafeArea()
 
             VStack {
+                HStack {
+                    if connectivity.connectionState == .connected {
+                        LiveBadge()
+                    }
+                    Spacer()
+                }
+                .padding(.horizontal, Theme.Padding.m)
+                .padding(.top, Theme.Padding.s)
+
                 ThrottleIndicator(tier: conditionManager.qualityTier)
                     .padding(.top, 8)
                     .animation(.easeInOut, value: conditionManager.qualityTier)
@@ -64,12 +73,19 @@ struct CameraView: View {
         switch connectivity.connectionState {
         case .connected:
             if let director = connectivity.connectedPeers.first {
-                Label("Connected to \(director.displayName)", systemImage: "checkmark.circle.fill")
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .background(.ultraThinMaterial, in: Capsule())
+                HStack(alignment: .top, spacing: 8) {
+                    Circle()
+                        .fill(.green)
+                        .frame(width: 8, height: 8)
+                        .padding(.top, 5)
+                    Text("Connected to \(director.displayName)")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                    Spacer(minLength: 0)
+                }
+                .foregroundStyle(.white)
+                .padding(Theme.Padding.m)
+                .background(Color.black.opacity(0.8), in: RoundedRectangle(cornerRadius: 16))
             }
         case .connecting:
             HStack(spacing: 8) {
@@ -150,6 +166,28 @@ struct CameraView: View {
             }
             .background(Color.black.opacity(0.8), in: RoundedRectangle(cornerRadius: 20))
         }
+    }
+}
+
+// MARK: - Live Badge
+
+private struct LiveBadge: View {
+    var body: some View {
+        HStack(spacing: 6) {
+            Circle()
+                .fill(.red)
+                .frame(width: 8, height: 8)
+
+            Text("LIVE")
+                .font(.caption)
+                .fontWeight(.bold)
+                .fontDesign(.monospaced)
+                .tracking(1)
+        }
+        .foregroundStyle(.white)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(.black.opacity(0.6), in: Capsule())
     }
 }
 
