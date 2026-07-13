@@ -101,34 +101,54 @@ struct CameraView: View {
             .padding(.vertical, 12)
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
         default:
-            VStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 0) {
+                Text("NEARBY DIRECTORS")
+                    .font(.caption)
+                    .fontDesign(.monospaced)
+                    .foregroundStyle(.secondary)
+                    .tracking(1)
+                    .padding(.horizontal, Theme.Padding.m)
+                    .padding(.top, Theme.Padding.m)
+                    .padding(.bottom, Theme.Padding.s)
+
                 if connectivity.discoveredPeers.isEmpty {
-                    Label("Looking for directors…", systemImage: "magnifyingglass")
+                    Text("Looking for directors…")
                         .font(.subheadline)
-                        .fontWeight(.medium)
-                        .symbolEffect(.pulse, options: .repeating)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, Theme.Padding.m)
+                        .padding(.bottom, Theme.Padding.m)
                 } else {
-                    ForEach(connectivity.discoveredPeers, id: \.self) { peer in
-                        Button {
-                            connectivity.invitePeer(peer)
-                        } label: {
-                            HStack {
-                                Image(systemName: "person.fill")
-                                Text(peer.displayName)
-                                Spacer()
-                                Image(systemName: "arrow.right.circle.fill")
+                    VStack(alignment: .leading, spacing: 0) {
+                        ForEach(Array(connectivity.discoveredPeers.enumerated()), id: \.element) { index, peer in
+                            Button {
+                                connectivity.invitePeer(peer)
+                            } label: {
+                                HStack {
+                                    Text(peer.displayName)
+                                        .font(.body)
+                                        .fontWeight(.semibold)
+                                        .foregroundStyle(.primary)
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
+                                        .font(.caption)
+                                        .foregroundStyle(.tertiary)
+                                }
+                                .padding(.horizontal, Theme.Padding.m)
+                                .padding(.vertical, Theme.Padding.s + 4)
+                                .contentShape(Rectangle())
                             }
-                            .font(.subheadline)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 10)
+                            .buttonStyle(.plain)
+
+                            if index < connectivity.discoveredPeers.count - 1 {
+                                Divider()
+                                    .padding(.leading, Theme.Padding.m)
+                            }
                         }
-                        .buttonStyle(.plain)
                     }
+                    .padding(.bottom, Theme.Padding.s)
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+            .background(Color.black.opacity(0.8), in: RoundedRectangle(cornerRadius: 20))
         }
     }
 }
