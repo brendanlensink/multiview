@@ -2,6 +2,14 @@
 
 Notes for AI agents working on this project.
 
+## Repository
+
+GitHub repo: `brendanlensink/multiview`
+
+## Agent Behaviour Preferences
+
+- **Default reviewer if ticket has no assignee:** `brendanlensink`
+
 ## Platform & Build
 
 - **iOS only** (iPhone/iPad), SwiftUI frontend, no macOS target
