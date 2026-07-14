@@ -23,6 +23,7 @@ struct ExportOptionsSheet: View {
         .presentationDetents([.medium])
         .presentationDragIndicator(.visible)
         .presentationBackground(.black)
+        .preferredColorScheme(.dark)
         .interactiveDismissDisabled(phase.isExporting)
     }
 
@@ -31,7 +32,6 @@ struct ExportOptionsSheet: View {
             Text("Export Recording")
                 .font(.title2)
                 .fontWeight(.bold)
-                .foregroundStyle(.white)
             Text("Choose how to save this session to Photos.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
@@ -100,7 +100,6 @@ struct ExportOptionsSheet: View {
 
             Text("Saved to Photos")
                 .font(.headline)
-                .foregroundStyle(.white)
 
             Spacer()
         }
@@ -121,7 +120,6 @@ struct ExportOptionsSheet: View {
 
             Text("Export Failed")
                 .font(.headline)
-                .foregroundStyle(.white)
 
             Text(message)
                 .font(.caption)
@@ -203,7 +201,6 @@ private struct ExportOptionRow: View {
                 Text(title)
                     .font(.body)
                     .fontWeight(.semibold)
-                    .foregroundStyle(.white)
                 Text(subtitle)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
