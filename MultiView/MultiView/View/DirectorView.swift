@@ -436,15 +436,17 @@ private struct RecordingIndicator: View {
                 .frame(width: 10, height: 10)
                 .opacity(dotVisible ? 1 : 0.3)
 
-            Text(startDate, style: .timer)
-                .font(.caption.monospacedDigit())
-                .fontWeight(.medium)
+            HStack(spacing: 6) {
+                Text(startDate, style: .timer)
 
-            if lostStreamCount > 0 {
-                Text("\(lostStreamCount) lost")
-                    .font(.caption2)
-                    .foregroundStyle(.yellow)
+                if lostStreamCount > 0 {
+                    Text("·")
+                    Text("\(lostStreamCount) lost")
+                }
             }
+            .font(.caption.monospacedDigit())
+            .fontDesign(.monospaced)
+            .fontWeight(.medium)
         }
         .foregroundStyle(.white)
         .padding(.horizontal, 10)
@@ -476,46 +478,32 @@ private struct PeerVideoCell: View {
                     .tint(.white)
             }
 
+            Text(isLocal ? "\(peerName.uppercased()) — YOU" : peerName.uppercased())
+                .font(.caption)
+                .fontDesign(.monospaced)
+                .fontWeight(.medium)
+                .tracking(1)
+                .foregroundStyle(.secondary)
+
             if isDisconnected {
                 Color.black.opacity(0.6)
-                VStack(spacing: 8) {
-                    Image(systemName: "wifi.slash")
-                        .font(.title2)
+                VStack(spacing: 10) {
+                    Circle()
+                        .strokeBorder(.white.opacity(0.6), lineWidth: 1.5)
+                        .frame(width: 36, height: 36)
                     Text("Disconnected")
-                        .font(.caption)
-                        .fontWeight(.medium)
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
                 }
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-
-            if isLocal {
-                Text("\(peerName.uppercased()) — YOU")
-                    .font(.caption)
-                    .fontDesign(.monospaced)
-                    .fontWeight(.medium)
-                    .tracking(1)
-                    .foregroundStyle(.secondary)
-            } else {
-                VStack {
-                    HStack {
-                        Text(peerName.uppercased())
-                            .font(.caption)
-                            .fontDesign(.monospaced)
-                            .fontWeight(.medium)
-                            .tracking(1)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(.black.opacity(0.6), in: RoundedRectangle(cornerRadius: 6))
-                            .foregroundStyle(.white)
-                        Spacer()
-                    }
-                    Spacer()
-                }
-                .padding(8)
-            }
         }
         .clipped()
+        .overlay {
+            Rectangle()
+                .strokeBorder(.white.opacity(0.08), lineWidth: 0.5)
+        }
         .overlay {
             if isLocal {
                 RoundedRectangle(cornerRadius: 4)
