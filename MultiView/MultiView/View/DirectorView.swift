@@ -525,53 +525,65 @@ private struct CameraListPopover: View {
         VStack(alignment: .leading, spacing: 0) {
             Text("Cameras")
                 .font(.headline)
+                .foregroundStyle(.white)
                 .padding(.horizontal, 16)
-                .padding(.top, 16)
-                .padding(.bottom, 8)
+                .padding(.vertical, 14)
 
-            ForEach(Array(allFeedIDs.enumerated()), id: \.element) { _, feedID in
+            rowDivider
+
+            ForEach(Array(allFeedIDs.enumerated()), id: \.element) { index, feedID in
                 let isHidden = layoutManager.hiddenFeeds.contains(feedID)
-                HStack {
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            if isHidden {
-                                layoutManager.hiddenFeeds.remove(feedID)
-                            } else {
-                                layoutManager.hiddenFeeds.insert(feedID)
-                            }
+                Button {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        if isHidden {
+                            layoutManager.hiddenFeeds.remove(feedID)
+                        } else {
+                            layoutManager.hiddenFeeds.insert(feedID)
                         }
-                    } label: {
-                        HStack {
-                            Image(systemName: feedID == .director ? "video.fill" : "camera.fill")
-                                .foregroundStyle(.secondary)
-                                .frame(width: 20)
-                            Text(feedID.displayName)
-                                .foregroundStyle(isHidden ? .secondary : .primary)
-                            Spacer()
-                            Image(systemName: isHidden ? "eye.slash" : "eye")
-                                .foregroundColor(isHidden ? .secondary : .blue)
-                        }
-                        .contentShape(Rectangle())
                     }
-                    .buttonStyle(.plain)
+                } label: {
+                    HStack(spacing: 12) {
+                        Text(feedID.displayName)
+                            .font(.body)
+                            .foregroundStyle(isHidden ? .white.opacity(0.35) : .white)
+                        Spacer()
 
-                    if feedID == .director, canSwitchDirectorCamera {
-                        Button {
-                            onSwitchDirectorCamera?()
-                        } label: {
-                            Image(systemName: "arrow.triangle.2.circlepath.camera")
-                                .foregroundStyle(.blue)
+                        if feedID == .director, canSwitchDirectorCamera {
+                            Button {
+                                onSwitchDirectorCamera?()
+                            } label: {
+                                Image(systemName: "circle")
+                                    .font(.system(size: 18))
+                                    .foregroundStyle(.white.opacity(0.7))
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Switch camera")
                         }
-                        .buttonStyle(.plain)
+
+                        Image(systemName: "minus")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(isHidden ? .white.opacity(0.25) : .white.opacity(0.6))
                     }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 14)
+                    .contentShape(Rectangle())
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
+                .buttonStyle(.plain)
+
+                if index < allFeedIDs.count - 1 {
+                    rowDivider
+                }
             }
         }
-        .padding(.bottom, 12)
-        .frame(minWidth: 220)
+        .frame(minWidth: 260)
         .presentationCompactAdaptation(.popover)
+        .presentationBackground(Color(white: 0.07))
+    }
+
+    private var rowDivider: some View {
+        Rectangle()
+            .fill(Color.white.opacity(0.1))
+            .frame(height: 1)
     }
 }
 
