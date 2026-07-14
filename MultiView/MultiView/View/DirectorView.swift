@@ -532,43 +532,21 @@ private struct CameraListPopover: View {
             rowDivider
 
             ForEach(Array(allFeedIDs.enumerated()), id: \.element) { index, feedID in
-                let isHidden = layoutManager.hiddenFeeds.contains(feedID)
-                Button {
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        if isHidden {
-                            layoutManager.hiddenFeeds.remove(feedID)
-                        } else {
-                            layoutManager.hiddenFeeds.insert(feedID)
-                        }
-                    }
-                } label: {
-                    HStack(spacing: 12) {
-                        Text(feedID.displayName)
-                            .font(.body)
-                            .foregroundStyle(isHidden ? .white.opacity(0.35) : .white)
-                        Spacer()
-
-                        if feedID == .director, canSwitchDirectorCamera {
-                            Button {
-                                onSwitchDirectorCamera?()
-                            } label: {
-                                Image(systemName: "circle")
-                                    .font(.system(size: 18))
-                                    .foregroundStyle(.white.opacity(0.7))
+                CameraRow(
+                    feedID: feedID,
+                    isHidden: layoutManager.hiddenFeeds.contains(feedID),
+                    canSwitchCamera: feedID == .director && canSwitchDirectorCamera,
+                    onSwitchCamera: onSwitchDirectorCamera,
+                    onToggleHidden: {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            if layoutManager.hiddenFeeds.contains(feedID) {
+                                layoutManager.hiddenFeeds.remove(feedID)
+                            } else {
+                                layoutManager.hiddenFeeds.insert(feedID)
                             }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel("Switch camera")
                         }
-
-                        Image(systemName: "minus")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(isHidden ? .white.opacity(0.25) : .white.opacity(0.6))
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 14)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
+                )
 
                 if index < allFeedIDs.count - 1 {
                     rowDivider
@@ -584,6 +562,51 @@ private struct CameraListPopover: View {
         Rectangle()
             .fill(Color.white.opacity(0.1))
             .frame(height: 1)
+    }
+}
+
+// MARK: - Camera Row
+
+private struct CameraRow: View {
+    let feedID: FeedID
+    let isHidden: Bool
+    var canSwitchCamera = false
+    var onSwitchCamera: (() -> Void)?
+    var onToggleHidden: () -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Button(action: onToggleHidden) {
+                Text(feedID.displayName)
+                    .font(.body)
+                    .foregroundStyle(isHidden ? .white.opacity(0.35) : .white)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if canSwitchCamera {
+                Button {
+                    onSwitchCamera?()
+                } label: {
+                    Image(systemName: "circle")
+                        .font(.system(size: 18))
+                        .foregroundStyle(.white.opacity(0.7))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Switch camera")
+            }
+
+            Button(action: onToggleHidden) {
+                Image(systemName: "minus")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(isHidden ? .white.opacity(0.25) : .white.opacity(0.6))
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
     }
 }
 
