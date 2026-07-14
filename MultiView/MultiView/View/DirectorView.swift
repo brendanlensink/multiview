@@ -525,53 +525,88 @@ private struct CameraListPopover: View {
         VStack(alignment: .leading, spacing: 0) {
             Text("Cameras")
                 .font(.headline)
+                .foregroundStyle(.white)
                 .padding(.horizontal, 16)
-                .padding(.top, 16)
-                .padding(.bottom, 8)
+                .padding(.vertical, 14)
 
-            ForEach(Array(allFeedIDs.enumerated()), id: \.element) { _, feedID in
-                let isHidden = layoutManager.hiddenFeeds.contains(feedID)
-                HStack {
-                    Button {
+            rowDivider
+
+            ForEach(Array(allFeedIDs.enumerated()), id: \.element) { index, feedID in
+                CameraRow(
+                    feedID: feedID,
+                    isHidden: layoutManager.hiddenFeeds.contains(feedID),
+                    canSwitchCamera: feedID == .director && canSwitchDirectorCamera,
+                    onSwitchCamera: onSwitchDirectorCamera,
+                    onToggleHidden: {
                         withAnimation(.easeInOut(duration: 0.3)) {
-                            if isHidden {
+                            if layoutManager.hiddenFeeds.contains(feedID) {
                                 layoutManager.hiddenFeeds.remove(feedID)
                             } else {
                                 layoutManager.hiddenFeeds.insert(feedID)
                             }
                         }
-                    } label: {
-                        HStack {
-                            Image(systemName: feedID == .director ? "video.fill" : "camera.fill")
-                                .foregroundStyle(.secondary)
-                                .frame(width: 20)
-                            Text(feedID.displayName)
-                                .foregroundStyle(isHidden ? .secondary : .primary)
-                            Spacer()
-                            Image(systemName: isHidden ? "eye.slash" : "eye")
-                                .foregroundColor(isHidden ? .secondary : .blue)
-                        }
-                        .contentShape(Rectangle())
                     }
-                    .buttonStyle(.plain)
+                )
 
-                    if feedID == .director, canSwitchDirectorCamera {
-                        Button {
-                            onSwitchDirectorCamera?()
-                        } label: {
-                            Image(systemName: "arrow.triangle.2.circlepath.camera")
-                                .foregroundStyle(.blue)
-                        }
-                        .buttonStyle(.plain)
-                    }
+                if index < allFeedIDs.count - 1 {
+                    rowDivider
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
             }
         }
-        .padding(.bottom, 12)
-        .frame(minWidth: 220)
+        .frame(minWidth: 260)
         .presentationCompactAdaptation(.popover)
+        .presentationBackground(Color(white: 0.07))
+    }
+
+    private var rowDivider: some View {
+        Rectangle()
+            .fill(Color.white.opacity(0.1))
+            .frame(height: 1)
+    }
+}
+
+// MARK: - Camera Row
+
+private struct CameraRow: View {
+    let feedID: FeedID
+    let isHidden: Bool
+    var canSwitchCamera = false
+    var onSwitchCamera: (() -> Void)?
+    var onToggleHidden: () -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Button(action: onToggleHidden) {
+                Text(feedID.displayName)
+                    .font(.body)
+                    .foregroundStyle(isHidden ? .white.opacity(0.35) : .white)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if canSwitchCamera {
+                Button {
+                    onSwitchCamera?()
+                } label: {
+                    Image(systemName: "circle")
+                        .font(.system(size: 18))
+                        .foregroundStyle(.white.opacity(0.7))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Switch camera")
+            }
+
+            Button(action: onToggleHidden) {
+                Image(systemName: "minus")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(isHidden ? .white.opacity(0.25) : .white.opacity(0.6))
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
     }
 }
 
