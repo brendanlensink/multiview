@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 enum Role: Hashable {
     case director
@@ -14,14 +15,8 @@ struct ContentView: View {
                 Spacer()
                 Spacer()
 
-                RoundedRectangle(cornerRadius: 14)
-                    .stroke(Color.secondary.opacity(0.4), lineWidth: 1)
+                AppIconView()
                     .frame(width: 56, height: 56)
-                    .overlay {
-                        Image(systemName: "square.grid.2x2.fill")
-                            .font(.title3)
-                            .foregroundStyle(.primary)
-                    }
                     .padding(.bottom, 16)
 
                 Text("COVERAGE")
@@ -29,13 +24,6 @@ struct ContentView: View {
                     .fontWeight(.bold)
                     .fontDesign(.monospaced)
                     .tracking(2)
-                    .padding(.bottom, 6)
-
-                Text("MULTI-CAM · SYNCED · LOCAL")
-                    .font(.caption2)
-                    .fontDesign(.monospaced)
-                    .tracking(1.2)
-                    .foregroundStyle(.secondary)
 
                 Spacer()
                 Spacer()
@@ -118,6 +106,39 @@ private struct RoleRow: View {
             }
         }
         .buttonStyle(.plain)
+    }
+}
+
+private struct AppIconView: View {
+    private var uiImage: UIImage? {
+        guard
+            let icons = Bundle.main.infoDictionary?["CFBundleIcons"] as? [String: Any],
+            let primaryIcon = icons["CFBundlePrimaryIcon"] as? [String: Any],
+            let iconFiles = primaryIcon["CFBundleIconFiles"] as? [String],
+            let iconName = iconFiles.last
+        else {
+            return nil
+        }
+        return UIImage(named: iconName)
+    }
+
+    var body: some View {
+        Group {
+            if let uiImage {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            } else {
+                RoundedRectangle(cornerRadius: 14)
+                    .stroke(Color.secondary.opacity(0.4), lineWidth: 1)
+                    .overlay {
+                        Image(systemName: "square.grid.2x2.fill")
+                            .font(.title3)
+                            .foregroundStyle(.primary)
+                    }
+            }
+        }
     }
 }
 
