@@ -1,7 +1,9 @@
 import SwiftUI
+import UIKit
 
 struct SettingsView: View {
     @AppStorage("captureQualityPreset") private var qualityPreset: String = CaptureQualityPreset.medium.rawValue
+    @Environment(\.dismiss) private var dismiss
 
     private var selectedPreset: CaptureQualityPreset {
         CaptureQualityPreset(rawValue: qualityPreset) ?? .medium
@@ -10,10 +12,20 @@ struct SettingsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "chevron.backward")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(width: 34, height: 34)
+                }
+                .buttonStyle(.glass)
+                .padding(.top, Theme.Padding.m)
+
                 Text("Settings")
                     .font(.largeTitle)
                     .fontWeight(.bold)
-                    .padding(.top, Theme.Padding.m)
+                    .padding(.top, Theme.Padding.s)
                     .padding(.bottom, Theme.Padding.l)
 
                 Text("CAPTURE QUALITY")
@@ -68,6 +80,7 @@ struct SettingsView: View {
             .padding(.horizontal, Theme.Padding.m)
         }
         .toolbar(.hidden, for: .navigationBar)
+        .background(InteractivePopGestureEnabler())
     }
 
     private static var versionString: String {
@@ -108,6 +121,30 @@ private struct QualityRow: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+}
+
+private struct InteractivePopGestureEnabler: UIViewControllerRepresentable {
+    func makeUIViewController(context: Context) -> UIViewController {
+        let controller = UIViewController()
+        controller.view.backgroundColor = .clear
+        return controller
+    }
+
+    func updateUIViewController(_ uiViewController: UIViewController, context: Context) {
+        DispatchQueue.main.async {
+            guard let navigationController = uiViewController.navigationController else { return }
+            navigationController.interactivePopGestureRecognizer?.isEnabled = true
+            navigationController.interactivePopGestureRecognizer?.delegate = context.coordinator
+        }
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+        func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+            true
+        }
     }
 }
 
