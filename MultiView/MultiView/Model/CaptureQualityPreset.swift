@@ -9,17 +9,17 @@ enum CaptureQualityPreset: String, CaseIterable, Identifiable {
 
     var displayName: String {
         switch self {
-        case .high: "High (1080p)"
-        case .medium: "Medium (720p)"
-        case .low: "Low (480p)"
+        case .high: "High"
+        case .medium: "Medium"
+        case .low: "Low"
         }
     }
 
     var subtitle: String {
         switch self {
-        case .high: "Best quality, uses more battery"
-        case .medium: "Balanced quality and performance"
-        case .low: "Saves battery and bandwidth"
+        case .high: "1080p · 8 Mbps"
+        case .medium: "720p · 4 Mbps"
+        case .low: "480p · 2 Mbps"
         }
     }
 

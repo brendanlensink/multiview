@@ -8,67 +8,106 @@ struct SettingsView: View {
     }
 
     var body: some View {
-        List {
-            Section {
-                ForEach(CaptureQualityPreset.allCases) { preset in
-                    Button {
-                        qualityPreset = preset.rawValue
-                    } label: {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(preset.displayName)
-                                    .foregroundStyle(.primary)
-                                Text(preset.subtitle)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                Text("Settings")
+                    .font(.largeTitle)
+                    .fontWeight(.bold)
+                    .padding(.top, Theme.Padding.m)
+                    .padding(.bottom, Theme.Padding.l)
 
-                            Spacer()
+                Text("CAPTURE QUALITY")
+                    .font(.caption)
+                    .fontDesign(.monospaced)
+                    .foregroundStyle(.secondary)
+                    .tracking(1)
+                    .padding(.bottom, Theme.Padding.s)
 
-                            if preset == selectedPreset {
-                                Image(systemName: "checkmark")
-                                    .foregroundStyle(Color.Theme.primary)
-                                    .fontWeight(.semibold)
-                            }
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(CaptureQualityPreset.allCases) { preset in
+                        QualityRow(
+                            preset: preset,
+                            isSelected: preset == selectedPreset
+                        ) {
+                            qualityPreset = preset.rawValue
                         }
+                        Divider()
                     }
                 }
-            } header: {
-                Text("Capture Quality")
-            } footer: {
-                Text("Quality may be reduced automatically when the device is warm.")
-            }
+                .padding(.bottom, Theme.Padding.l)
 
-            Section {
                 Link(destination: URL(string: "https://www.brendanlens.ink/privacypolicy")!) {
                     HStack {
                         Text("Privacy Policy")
+                            .font(.body)
                             .foregroundStyle(.primary)
                         Spacer()
                         Image(systemName: "arrow.up.right")
-                            .font(.caption)
+                            .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, Theme.Padding.m)
+                    .contentShape(Rectangle())
                 }
-            }
+                .buttonStyle(.plain)
+                Divider()
+                    .padding(.bottom, Theme.Padding.l)
 
-            Section {
                 HStack {
                     Text("Version")
+                        .font(.body)
+                        .foregroundStyle(.primary)
                     Spacer()
                     Text(Self.versionString)
+                        .font(.body)
                         .foregroundStyle(.secondary)
                 }
+                .padding(.vertical, Theme.Padding.m)
             }
+            .padding(.horizontal, Theme.Padding.m)
         }
-        .navigationTitle("Settings")
-        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.hidden, for: .navigationBar)
     }
 
     private static var versionString: String {
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
         let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "—"
         return "\(version) (\(build))"
+    }
+}
+
+private struct QualityRow: View {
+    let preset: CaptureQualityPreset
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(preset.displayName)
+                        .font(.body)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.primary)
+                    Text(preset.subtitle)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                if isSelected {
+                    Circle()
+                        .fill(Color.primary)
+                        .frame(width: 8, height: 8)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, Theme.Padding.m)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 }
 
