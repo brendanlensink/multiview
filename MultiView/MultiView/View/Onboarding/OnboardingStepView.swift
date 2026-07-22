@@ -20,22 +20,22 @@ struct OnboardingStepView: View {
             OnboardingStepContent(
                 icon: "camera",
                 title: "Camera Access",
-                message: "Coverage uses your camera to capture video from this device. Allow camera access so you can stream and record.",
-                buttonTitle: "Allow Camera Access"
+                message: "Coverage uses your camera to capture video from this device. Continue to enable camera access so you can stream and record.",
+                buttonTitle: "Continue"
             )
         case .microphone:
             OnboardingStepContent(
                 icon: "mic",
                 title: "Microphone Access",
-                message: "Coverage uses your microphone to record audio on the director device. Allow microphone access so recordings include sound.",
-                buttonTitle: "Allow Microphone Access"
+                message: "Coverage uses your microphone to record audio on the director device. Continue to enable microphone access so recordings include sound.",
+                buttonTitle: "Continue"
             )
         case .localNetwork:
             OnboardingStepContent(
                 icon: "wifi",
                 title: "Local Network Access",
-                message: "Coverage connects devices over your local network for multi-angle capture. Allow local network access so directors and cameras can find each other.",
-                buttonTitle: "Allow Local Network Access"
+                message: "Coverage connects devices over your local network for multi-angle capture. Continue to enable local network access so directors and cameras can find each other.",
+                buttonTitle: "Continue"
             )
         }
     }

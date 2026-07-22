@@ -1,10 +1,7 @@
 import SwiftUI
-import UIKit
 import AVFoundation
 
 struct PermissionDeniedView: View {
-    @Environment(\.openURL) private var openURL
-
     let cameraStatus: AVAuthorizationStatus
     let microphoneStatus: AVAuthorizationStatus
 
@@ -19,12 +16,12 @@ struct PermissionDeniedView: View {
                     .frame(width: 56, height: 56)
 
                 VStack(spacing: 12) {
-                    Text("Coverage Can't Run")
+                    Text("Coverage Needs Access")
                         .font(.title2)
                         .fontWeight(.bold)
                         .multilineTextAlignment(.center)
 
-                    Text("Required permissions are turned off. Enable them in Settings to use the app.")
+                    Text("Coverage captures video and audio, so it needs the permissions below. You can turn them on for Coverage anytime in the Settings app.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
@@ -39,23 +36,6 @@ struct PermissionDeniedView: View {
                     }
                 }
                 .overlay(Divider(), alignment: .top)
-            }
-
-            Spacer()
-
-            Button {
-                if let url = URL(string: UIApplication.openSettingsURLString) {
-                    openURL(url)
-                }
-            } label: {
-                Text("Open Settings")
-                    .font(.body)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(.black)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, Theme.Padding.m)
-                    .background(Color.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
             }
 
             Spacer()
