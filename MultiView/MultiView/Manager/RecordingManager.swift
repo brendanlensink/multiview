@@ -19,8 +19,6 @@ final class RecordingManager {
     private var currentStartDate: Date?
     private var currentStreamInfos: [RecordingSession.StreamInfo] = []
 
-    private static let localStreamID = "director"
-
     func startRecording(localPeerName: String, remotePeers: [MCPeerID]) {
         guard !isRecording else { return }
 
@@ -49,7 +47,8 @@ final class RecordingManager {
         lostStreamCount = 0
         logger.info("Recording session \(sessionID) starting at \(self.sessionStartTime.seconds)s")
 
-        let localFileName = "\(Self.sanitize(localPeerName)).mov"
+        var usedFileNames: Set<String> = []
+        let localFileName = uniqueFileName(for: localPeerName, usedFileNames: &usedFileNames)
         do {
             let localURL = sessionDir.appendingPathComponent(localFileName)
             let localRecorder = try StreamRecorder(
@@ -59,7 +58,7 @@ final class RecordingManager {
                 includeAudio: true,
                 sessionStartTime: sessionStartTime
             )
-            activeRecorders.set(localRecorder, for: Self.localStreamID)
+            activeRecorders.set(localRecorder, for: .local)
             currentStreamInfos.append(RecordingSession.StreamInfo(
                 label: localPeerName, fileName: localFileName, isLocal: true, hasAudio: true
             ))
@@ -69,7 +68,7 @@ final class RecordingManager {
 
         for peer in remotePeers {
             let streamID = peer.displayName
-            let fileName = "\(Self.sanitize(streamID)).mov"
+            let fileName = uniqueFileName(for: streamID, usedFileNames: &usedFileNames)
             let url = sessionDir.appendingPathComponent(fileName)
             do {
                 let recorder = try StreamRecorder(
@@ -79,7 +78,7 @@ final class RecordingManager {
                     includeAudio: false,
                     sessionStartTime: sessionStartTime
                 )
-                activeRecorders.set(recorder, for: streamID)
+                activeRecorders.set(recorder, for: .peer(peer))
                 currentStreamInfos.append(RecordingSession.StreamInfo(
                     label: streamID, fileName: fileName, isLocal: false, hasAudio: false
                 ))
@@ -128,7 +127,7 @@ final class RecordingManager {
     func finalizePeerStream(_ peer: MCPeerID) {
         guard isRecording else { return }
         let streamID = peer.displayName
-        guard let recorder = activeRecorders.remove(for: streamID) else { return }
+        guard let recorder = activeRecorders.remove(for: .peer(peer)) else { return }
 
         lostStreamCount += 1
         logger.info("Finalizing disconnected peer stream '\(streamID)'")
@@ -143,7 +142,7 @@ final class RecordingManager {
 
     func finalizeLocalStream() {
         guard isRecording else { return }
-        guard let recorder = activeRecorders.remove(for: Self.localStreamID) else { return }
+        guard let recorder = activeRecorders.remove(for: .local) else { return }
 
         lostStreamCount += 1
         logger.info("Finalizing local stream due to capture interruption")
@@ -180,15 +179,15 @@ final class RecordingManager {
     }
 
     nonisolated func appendLocalSample(_ sampleBuffer: CMSampleBuffer) {
-        activeRecorders.recorder(for: "director")?.appendVideo(sampleBuffer)
+        activeRecorders.recorder(for: .local)?.appendVideo(sampleBuffer)
     }
 
     nonisolated func appendLocalAudio(_ sampleBuffer: CMSampleBuffer) {
-        activeRecorders.recorder(for: "director")?.appendAudio(sampleBuffer)
+        activeRecorders.recorder(for: .local)?.appendAudio(sampleBuffer)
     }
 
     nonisolated func appendPeerSample(_ sampleBuffer: CMSampleBuffer, from peer: MCPeerID) {
-        activeRecorders.recorder(for: peer.displayName)?.appendVideo(sampleBuffer)
+        activeRecorders.recorder(for: .peer(peer))?.appendVideo(sampleBuffer)
     }
 
     // MARK: - Private
@@ -238,6 +237,20 @@ final class RecordingManager {
         logger.info("Background finalization complete")
     }
 
+    /// Peer displayName (UIDevice.current.name) isn't unique — two iPhones both left at the
+    /// default "iPhone" name would otherwise collide on the same output file.
+    private func uniqueFileName(for streamID: String, usedFileNames: inout Set<String>) -> String {
+        let base = Self.sanitize(streamID)
+        var candidate = "\(base).mov"
+        var suffix = 2
+        while usedFileNames.contains(candidate) {
+            candidate = "\(base)-\(suffix).mov"
+            suffix += 1
+        }
+        usedFileNames.insert(candidate)
+        return candidate
+    }
+
     private static func sanitize(_ name: String) -> String {
         let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_"))
         return name.unicodeScalars
@@ -248,23 +261,30 @@ final class RecordingManager {
 
 // MARK: - Thread-Safe Recorder Storage
 
+/// Identifies a recorder slot. Remote peers are keyed by MCPeerID itself (not displayName,
+/// which is just the user-assigned device name and can collide across two physical devices).
+private enum RecorderKey: Hashable {
+    case local
+    case peer(MCPeerID)
+}
+
 private final class ActiveRecorders: Sendable {
     private let lock = NSLock()
-    private nonisolated(unsafe) var storage: [String: StreamRecorder] = [:]
+    private nonisolated(unsafe) var storage: [RecorderKey: StreamRecorder] = [:]
 
     var count: Int {
         lock.withLock { storage.count }
     }
 
-    func set(_ recorder: StreamRecorder, for key: String) {
+    func set(_ recorder: StreamRecorder, for key: RecorderKey) {
         lock.withLock { storage[key] = recorder }
     }
 
-    func recorder(for key: String) -> StreamRecorder? {
+    func recorder(for key: RecorderKey) -> StreamRecorder? {
         lock.withLock { storage[key] }
     }
 
-    func remove(for key: String) -> StreamRecorder? {
+    func remove(for key: RecorderKey) -> StreamRecorder? {
         lock.withLock { storage.removeValue(forKey: key) }
     }
 

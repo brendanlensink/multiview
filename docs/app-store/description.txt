@@ -1,0 +1,25 @@
+Coverage turns the iPhones you already have into a synced multi-camera rig — no extra hardware, no accounts, no internet connection required.
+
+Pick one phone as the Director and turn any other nearby iPhones into Cameras. The Director finds them automatically over your local network, shows every live feed in a grid, and starts and stops recording on all of them with a single tap. Every angle is captured with synchronized timestamps, so it's ready to cut together the moment you're done.
+
+HOW IT WORKS
+• Open the app, choose Director or Camera — that's the whole setup.
+• Camera devices appear on the Director automatically. One tap to connect.
+• The Director shows a live grid of every connected angle at all times.
+• Start recording once, and every device records in sync.
+• Stop recording, then export as a single split-screen composite or as separate files per angle, saved straight to your camera roll.
+
+WHY COVERAGE
+• No accounts, no sign-in, no cloud — everything runs peer-to-peer over your local network.
+• No dedicated capture hardware — just the iPhones already in the room.
+• Grid composite export gives you an instant multi-angle video, no editing required.
+• Separate-file export hands you synced clips ready to drop into your NLE of choice.
+• Adjustable capture quality (resolution and bitrate) to balance video fidelity against network conditions.
+
+GREAT FOR
+• Podcasts and interviews — capture every speaker's angle at once.
+• Vlogs and tutorials — a front angle and a hands angle, recorded together.
+• Family moments and events — cover more of the room without missing a beat.
+• Behind-the-scenes and product shoots — multiple angles without a video village.
+
+Coverage works with a few connected cameras at once (practical limits depend on your local network and device hardware), streaming live over Wi-Fi with no data ever leaving your devices.
