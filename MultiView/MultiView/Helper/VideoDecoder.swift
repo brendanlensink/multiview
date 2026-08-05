@@ -8,13 +8,20 @@ final class VideoDecoder: @unchecked Sendable {
     var onRecordSampleBuffer: (@Sendable (CMSampleBuffer) -> Void)?
     var onFormatChanged: (@Sendable () -> Void)?
 
+    private var lastMissingKeyframeLog = ContinuousClock.now
+    private static let missingKeyframeLogInterval: Duration = .seconds(5)
+
     func decode(packet: FramePacket) {
         if packet.isKeyFrame, let paramData = packet.parameterSets {
             updateFormatDescription(from: paramData)
         }
 
         guard let formatDesc = formatDescription else {
-            logger.debug("Waiting for keyframe with parameter sets")
+            let now = ContinuousClock.now
+            if now - lastMissingKeyframeLog >= Self.missingKeyframeLogInterval {
+                lastMissingKeyframeLog = now
+                logger.debug("Still waiting for keyframe with parameter sets")
+            }
             return
         }
 

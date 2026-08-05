@@ -80,9 +80,11 @@ struct PhotosExporter {
         case .notDetermined:
             let granted = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
             guard granted == .authorized || granted == .limited else {
+                logger.warning("Photo library access denied after prompt (status: \(String(describing: granted)))")
                 throw ExportError.accessDenied
             }
         default:
+            logger.warning("Photo library access not authorized (status: \(String(describing: status)))")
             throw ExportError.accessDenied
         }
     }
