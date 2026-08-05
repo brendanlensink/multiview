@@ -1,8 +1,7 @@
 import VideoToolbox
-import os
 
 final class VideoDecoder: @unchecked Sendable {
-    private let logger = Logger(subsystem: "com.multiview", category: "VideoDecoder")
+    private let logger = AppLogger.make(category: "VideoDecoder")
 
     private var formatDescription: CMFormatDescription?
     var onSampleBuffer: (@Sendable (CMSampleBuffer) -> Void)?

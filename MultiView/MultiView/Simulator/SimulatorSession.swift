@@ -1,12 +1,11 @@
 #if targetEnvironment(simulator)
 import CoreMedia
 import MultipeerConnectivity
-import os
 import QuartzCore
 
 @MainActor
 final class SimulatorSession {
-    private let logger = Logger(subsystem: "com.multiview", category: "Simulator")
+    private let logger = AppLogger.make(category: "Simulator")
 
     private let peerVideoManager: PeerVideoManager
     private let localDisplayLayer: SampleBufferDisplayLayer

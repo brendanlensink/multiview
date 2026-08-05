@@ -31,8 +31,8 @@ GitHub repo: `brendanlensink/multiview`
 ## Platform & Build
 
 - **iOS only** (iPhone/iPad), SwiftUI frontend, no macOS target
-- No external dependencies — pure Apple frameworks
-- Uses `PBXFileSystemSynchronizedRootGroup`, so Xcode auto-discovers files in `MultiView/`. No `pbxproj` changes needed when adding or removing source files.
+- Almost entirely Apple frameworks; the one exception is `XCGLogger` (app-wide logging, see `Helper/AppLogger.swift`)
+- Uses `PBXFileSystemSynchronizedRootGroup`, so Xcode auto-discovers files in `MultiView/`. No `pbxproj` changes needed when adding or removing source files — that only applies to adding a new SPM package itself, which does require editing the `XCRemoteSwiftPackageReference`/`XCSwiftPackageProductDependency` sections by hand or via Xcode's UI.
 
 ## Source Layout
 
@@ -61,7 +61,11 @@ All source lives under `MultiView/MultiView/`:
 | `RecordingStore.swift` | Manages recording temp directory — lists completed sessions, cleans up orphaned recordings |
 | `PhotosExporter.swift` | Exports recording sessions to the Photos library via `PHPhotoLibrary`, cleans up temp files on success |
 | `GridCompositor.swift` | Composites multiple angle recordings into a single split-screen video via `AVMutableComposition` + `AVVideoComposition` |
-| `SettingsView.swift` | Settings page — capture quality presets, privacy policy link, version/build info |
+| `SettingsView.swift` | Settings page — capture quality presets, advanced logging toggle, privacy policy link, version/build info |
+| `AppLogger.swift` | Wraps XCGLogger; `CategoryLogger` is the Sendable-safe drop-in replacement for the old per-file `os.Logger` |
+| `LogStore.swift` | In-memory ring buffer of log lines, only populated while advanced logging is enabled; backs `LogsView` |
+| `LogsView.swift` | Live-updating log viewer pushed from Settings, with a share button |
+| `LogsShareSheet.swift` | Share sheet for log text — Copy gets plain text, Mail/Messages get a `.txt` file attachment |
 | `CaptureQualityPreset.swift` | User-selectable capture quality levels (High/Medium/Low) with resolution and bitrate mappings |
 | `ExportOptionsSheet.swift` | Post-recording export UI — choose between separate files or grid composite export |
 | `TestPatternGenerator.swift` | Generates static test pattern `CVPixelBuffer`s with colored bars and labels (simulator only) |

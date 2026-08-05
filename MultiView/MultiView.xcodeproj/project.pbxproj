@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		B32D541F2FD7497700103EEC /* NiceComponents in Frameworks */ = {isa = PBXBuildFile; productRef = B32D541E2FD7497700103EEC /* NiceComponents */; };
 		B32D54212FD7497700103EEC /* NiceInit in Frameworks */ = {isa = PBXBuildFile; productRef = B32D54202FD7497700103EEC /* NiceInit */; };
+		F85303B3DBDAF76DFAE9E0E9 /* XCGLogger in Frameworks */ = {isa = PBXBuildFile; productRef = D2290385F47B9160F9E7FC48 /* XCGLogger */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -30,6 +31,7 @@
 			files = (
 				B32D541F2FD7497700103EEC /* NiceComponents in Frameworks */,
 				B32D54212FD7497700103EEC /* NiceInit in Frameworks */,
+				F85303B3DBDAF76DFAE9E0E9 /* XCGLogger in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -74,6 +76,7 @@
 			packageProductDependencies = (
 				B32D541E2FD7497700103EEC /* NiceComponents */,
 				B32D54202FD7497700103EEC /* NiceInit */,
+				D2290385F47B9160F9E7FC48 /* XCGLogger */,
 			);
 			productName = MultiView;
 			productReference = A1000001 /* Coverage.app */;
@@ -105,6 +108,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				B32D541D2FD7497700103EEC /* XCRemoteSwiftPackageReference "niceComponents" */,
+				E2D3029D5F5143D8A8F6A426 /* XCRemoteSwiftPackageReference "XCGLogger" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = A1000005 /* Products */;
@@ -360,6 +364,14 @@
 				minimumVersion = 2.2.0;
 			};
 		};
+		E2D3029D5F5143D8A8F6A426 /* XCRemoteSwiftPackageReference "XCGLogger" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/DaveWoodCom/XCGLogger.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 7.0.1;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -372,6 +384,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = B32D541D2FD7497700103EEC /* XCRemoteSwiftPackageReference "niceComponents" */;
 			productName = NiceInit;
+		};
+		D2290385F47B9160F9E7FC48 /* XCGLogger */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E2D3029D5F5143D8A8F6A426 /* XCRemoteSwiftPackageReference "XCGLogger" */;
+			productName = XCGLogger;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

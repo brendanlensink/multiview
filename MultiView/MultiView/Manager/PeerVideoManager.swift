@@ -1,11 +1,10 @@
 import CoreMedia
 import MultipeerConnectivity
-import os
 import SwiftUI
 
 @MainActor @Observable
 final class PeerVideoManager {
-    private let logger = Logger(subsystem: "com.multiview", category: "PeerVideo")
+    private let logger = AppLogger.make(category: "PeerVideo")
 
     private var decoders: [MCPeerID: VideoDecoder] = [:]
     private(set) var displayLayers: [MCPeerID: SampleBufferDisplayLayer] = [:]

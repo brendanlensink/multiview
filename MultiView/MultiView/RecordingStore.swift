@@ -1,8 +1,7 @@
 import Foundation
-import os
 
 struct RecordingStore {
-    private static let logger = Logger(subsystem: "com.multiview", category: "RecordingStore")
+    private static let logger = AppLogger.make(category: "RecordingStore")
 
     static let recordingsDirectory: URL = {
         FileManager.default.temporaryDirectory.appendingPathComponent("recordings", isDirectory: true)
