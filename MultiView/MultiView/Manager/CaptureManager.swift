@@ -18,6 +18,10 @@ final class CaptureManager: NSObject {
     private(set) var error: String?
     private(set) var cameraPosition: AVCaptureDevice.Position = .back
 
+    private nonisolated(unsafe) var droppedFrameCount = 0
+    private nonisolated(unsafe) var lastDroppedFrameLog = ContinuousClock.now
+    private nonisolated static let droppedFrameLogInterval: Duration = .seconds(10)
+
     var canSwitchCamera: Bool {
         AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: cameraPosition == .back ? .front : .back) != nil
     }
@@ -244,7 +248,12 @@ extension CaptureManager: AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptur
     }
 
     nonisolated func captureOutput(_ output: AVCaptureOutput, didDrop sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
-        logger.debug("Dropped frame")
+        droppedFrameCount += 1
+        let now = ContinuousClock.now
+        guard now - lastDroppedFrameLog >= Self.droppedFrameLogInterval else { return }
+        lastDroppedFrameLog = now
+        logger.info("Dropped \(self.droppedFrameCount) frames in the last \(Int(Self.droppedFrameLogInterval.components.seconds))s")
+        droppedFrameCount = 0
     }
 }
 

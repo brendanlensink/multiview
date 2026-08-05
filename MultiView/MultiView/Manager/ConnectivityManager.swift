@@ -130,6 +130,7 @@ final class ConnectivityManager: NSObject {
         connectedPeers.removeAll()
         discoveredPeers.removeAll()
         connectionState = .idle
+        logger.info("Disconnected")
     }
 
     // MARK: - Data Sending

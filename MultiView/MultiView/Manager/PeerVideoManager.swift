@@ -18,6 +18,7 @@ final class PeerVideoManager {
         decoders[peer]?.invalidate()
         decoders.removeValue(forKey: peer)
         displayLayers.removeValue(forKey: peer)
+        logger.info("Removed decoder and display layer for \(peer.displayName)")
     }
 
     func removeAllPeers() {

@@ -24,6 +24,15 @@ struct GridCompositor {
     }
 
     static func composite(_ session: RecordingSession, onProgress: (@Sendable (Float) -> Void)? = nil) async throws -> URL {
+        do {
+            return try await performComposite(session, onProgress: onProgress)
+        } catch {
+            logger.error("Grid composite failed for session \(session.id): \(error.localizedDescription)")
+            throw error
+        }
+    }
+
+    private static func performComposite(_ session: RecordingSession, onProgress: (@Sendable (Float) -> Void)?) async throws -> URL {
         let streams = session.streams
         guard !streams.isEmpty else { throw CompositorError.noStreams }
 
