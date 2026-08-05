@@ -1,8 +1,7 @@
 import Foundation
-import os
 
 final class FrameSender: @unchecked Sendable {
-    private let logger = Logger(subsystem: "com.multiview", category: "FrameSender")
+    private let logger = AppLogger.make(category: "FrameSender")
 
     private let send: @Sendable (FramePacket, SendMode) -> Void
     private let queue = DispatchQueue(label: "com.multiview.frame-sender")

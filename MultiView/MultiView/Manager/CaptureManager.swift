@@ -1,11 +1,10 @@
 import AVFoundation
 import Observation
 import UIKit
-import os
 
 @MainActor @Observable
 final class CaptureManager: NSObject {
-    private nonisolated let logger = Logger(subsystem: "com.multiview", category: "Capture")
+    private nonisolated let logger = AppLogger.make(category: "Capture")
 
     private nonisolated(unsafe) let captureSession = AVCaptureSession()
     private nonisolated(unsafe) let videoOutput = AVCaptureVideoDataOutput()

@@ -1,8 +1,7 @@
 import AVFoundation
-import os
 
 final class StreamRecorder: @unchecked Sendable {
-    private let logger = Logger(subsystem: "com.multiview", category: "StreamRecorder")
+    private let logger = AppLogger.make(category: "StreamRecorder")
 
     private let assetWriter: AVAssetWriter
     private var videoInput: AVAssetWriterInput?

@@ -1,6 +1,5 @@
 import Foundation
 import MultipeerConnectivity
-import os
 
 struct SyncPing {
     static let messageType: UInt8 = 0x02
@@ -69,7 +68,7 @@ struct SyncPong {
 }
 
 final class TimeSyncManager: @unchecked Sendable {
-    private let logger = Logger(subsystem: "com.multiview", category: "TimeSync")
+    private let logger = AppLogger.make(category: "TimeSync")
 
     private let queue = DispatchQueue(label: "com.multiview.time-sync")
     private var offsets: [MCPeerID: Int64] = [:]
@@ -141,7 +140,8 @@ final class TimeSyncManager: @unchecked Sendable {
             }
             roundTripTimes[peer] = rtt
 
-            logger.info("Sync with \(peer.displayName): offset=\(self.offsets[peer]!)ns, RTT=\(rtt)ns (\(Double(rtt) / 1_000_000, format: .fixed(precision: 1))ms)")
+            let rttMilliseconds = String(format: "%.1f", Double(rtt) / 1_000_000)
+            logger.info("Sync with \(peer.displayName): offset=\(self.offsets[peer]!)ns, RTT=\(rtt)ns (\(rttMilliseconds)ms)")
         }
     }
 

@@ -1,8 +1,7 @@
 import VideoToolbox
-import os
 
 final class VideoEncoder: @unchecked Sendable {
-    private let logger = Logger(subsystem: "com.multiview", category: "VideoEncoder")
+    private let logger = AppLogger.make(category: "VideoEncoder")
 
     private var compressionSession: VTCompressionSession?
     private var sessionWidth: Int32 = 0

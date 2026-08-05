@@ -1,12 +1,11 @@
 import AVFoundation
 import MultipeerConnectivity
-import os
 import SwiftUI
 import UIKit
 
 @MainActor @Observable
 final class RecordingManager {
-    private let logger = Logger(subsystem: "com.multiview", category: "Recording")
+    private let logger = AppLogger.make(category: "Recording")
 
     private(set) var isRecording = false
     private(set) var lostStreamCount = 0
@@ -134,7 +133,7 @@ final class RecordingManager {
 
         Task.detached {
             if let url = await recorder.finish() {
-                Logger(subsystem: "com.multiview", category: "Recording")
+                AppLogger.make(category: "Recording")
                     .info("Saved partial recording for '\(streamID)' at \(url.lastPathComponent)")
             }
         }

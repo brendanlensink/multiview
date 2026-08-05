@@ -3,6 +3,7 @@ import UIKit
 
 struct SettingsView: View {
     @AppStorage("captureQualityPreset") private var qualityPreset: String = CaptureQualityPreset.medium.rawValue
+    @AppStorage("advancedLoggingEnabled") private var advancedLoggingEnabled: Bool = false
     @Environment(\.dismiss) private var dismiss
 
     private var selectedPreset: CaptureQualityPreset {
@@ -44,6 +45,47 @@ struct SettingsView: View {
                             qualityPreset = preset.rawValue
                         }
                         Divider()
+                    }
+                }
+                .padding(.bottom, Theme.Padding.l)
+
+                Text("ADVANCED")
+                    .font(.caption)
+                    .fontDesign(.monospaced)
+                    .foregroundStyle(.secondary)
+                    .tracking(1)
+                    .padding(.bottom, Theme.Padding.s)
+
+                VStack(alignment: .leading, spacing: 0) {
+                    Toggle(isOn: $advancedLoggingEnabled) {
+                        Text("Enable advanced logging")
+                            .font(.body)
+                            .foregroundStyle(.primary)
+                    }
+                    .padding(.vertical, Theme.Padding.m)
+                    .onChange(of: advancedLoggingEnabled) { _, newValue in
+                        AppLogger.setAdvancedLoggingEnabled(newValue)
+                    }
+
+                    if advancedLoggingEnabled {
+                        Divider()
+                        NavigationLink {
+                            LogsView()
+                        } label: {
+                            HStack {
+                                Text("View Logs")
+                                    .font(.body)
+                                    .foregroundStyle(.primary)
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                                    .foregroundStyle(.tertiary)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.vertical, Theme.Padding.m)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
                 .padding(.bottom, Theme.Padding.l)
@@ -121,30 +163,6 @@ private struct QualityRow: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-    }
-}
-
-private struct InteractivePopGestureEnabler: UIViewControllerRepresentable {
-    func makeUIViewController(context: Context) -> UIViewController {
-        let controller = UIViewController()
-        controller.view.backgroundColor = .clear
-        return controller
-    }
-
-    func updateUIViewController(_ uiViewController: UIViewController, context: Context) {
-        DispatchQueue.main.async {
-            guard let navigationController = uiViewController.navigationController else { return }
-            navigationController.interactivePopGestureRecognizer?.isEnabled = true
-            navigationController.interactivePopGestureRecognizer?.delegate = context.coordinator
-        }
-    }
-
-    func makeCoordinator() -> Coordinator { Coordinator() }
-
-    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
-        func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
-            true
-        }
     }
 }
 

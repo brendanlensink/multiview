@@ -1,9 +1,8 @@
 import Foundation
-import os
 import Photos
 
 struct PhotosExporter {
-    private static let logger = Logger(subsystem: "com.multiview", category: "PhotosExporter")
+    private static let logger = AppLogger.make(category: "PhotosExporter")
 
     enum ExportError: LocalizedError {
         case accessDenied

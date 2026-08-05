@@ -1,6 +1,5 @@
 import Observation
 import UIKit
-import os
 
 enum CaptureQualityTier: Int, Comparable, Sendable {
     case full = 0
@@ -22,7 +21,7 @@ enum CaptureQualityTier: Int, Comparable, Sendable {
 
 @MainActor @Observable
 final class DeviceConditionManager {
-    private nonisolated let logger = Logger(subsystem: "com.multiview", category: "DeviceCondition")
+    private nonisolated let logger = AppLogger.make(category: "DeviceCondition")
 
     private(set) var qualityTier: CaptureQualityTier = .full
     private(set) var thermalState: ProcessInfo.ThermalState = .nominal

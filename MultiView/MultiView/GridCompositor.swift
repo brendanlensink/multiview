@@ -1,9 +1,8 @@
 import AVFoundation
 import CoreGraphics
-import os
 
 struct GridCompositor {
-    private static let logger = Logger(subsystem: "com.multiview", category: "GridCompositor")
+    private static let logger = AppLogger.make(category: "GridCompositor")
 
     static let outputSize = CGSize(width: 1920, height: 1080)
 

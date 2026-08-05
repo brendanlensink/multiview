@@ -1,7 +1,6 @@
 import Foundation
 import MultipeerConnectivity
 import UIKit
-import os
 
 enum ConnectionState: Equatable, Sendable {
     case idle
@@ -23,7 +22,7 @@ final class ConnectivityManager: NSObject {
     private static let displayNameKey = "multiview-display-name"
     private static let reconnectDelay: TimeInterval = 2
 
-    private nonisolated let logger = Logger(subsystem: "com.multiview", category: "Connectivity")
+    private nonisolated let logger = AppLogger.make(category: "Connectivity")
 
     private(set) var connectionState: ConnectionState = .idle
     private(set) var connectedPeers: [MCPeerID] = []

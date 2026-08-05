@@ -8,6 +8,8 @@ struct MultiViewApp: App {
     @Environment(\.scenePhase) private var scenePhase
 
     init() {
+        AppLogger.setAdvancedLoggingEnabled(UserDefaults.standard.bool(forKey: "advancedLoggingEnabled"))
+
         RecordingStore.cleanupIncompleteRecordings()
 
         Config.current = Config(

@@ -1,9 +1,8 @@
 import AVFoundation
 import SwiftUI
-import os
 
 final class SampleBufferDisplayLayer: @unchecked Sendable {
-    private let logger = Logger(subsystem: "com.multiview", category: "DisplayLayer")
+    private let logger = AppLogger.make(category: "DisplayLayer")
 
     let displayLayer = AVSampleBufferDisplayLayer()
     private var needsFlush = false
